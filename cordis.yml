@@ -1,0 +1,10 @@
+# Example overlay for loading this plugin into a DeepSeek Harness checkout.
+#
+# Usage (from the harness repository root):
+#   pnpm dsh web --patch /absolute/path/to/dsh-plugin-project-management/cordis.yml
+#
+# The plugin path below must be absolute and point at the compiled entry.
+# Build the plugin first with `npm run build` (or `pnpm build`).
+- insert:
+    - id: project-management
+      name: '/absolute/path/to/dsh-plugin-project-management/dist/index.js'

@@ -1,0 +1,39 @@
+{
+  "name": "dsh-plugin-project-management",
+  "version": "0.1.0",
+  "description": "Interview users, then generate and export project timelines / Gantt charts (Word + Excel) in DeepSeek Harness.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "docx": "^9.7.1",
+    "exceljs": "^4.4.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-tools": "0.0.1-rc.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-tools": "0.0.1-rc.1",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
