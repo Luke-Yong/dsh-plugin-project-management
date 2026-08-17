@@ -1,9 +1,10 @@
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool, type ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from '@deepseek-ai/dsh-session'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { buildDocx, buildXlsx, slugify } from './export.js'
 import { schedule, type TaskInput } from './scheduler.js'
+import { loadProject, saveProject, type ProjectState } from './state.js'
 import type { ProjectDefinition, Timeline } from './types.js'
 
 // ---------------------------------------------------------------------------
@@ -110,7 +111,7 @@ const patchSchema = {
 // Render helpers
 // ---------------------------------------------------------------------------
 
-function renderTimeline(timeline: Timeline): string {
+function renderTimeline(timeline: Timeline, statePath?: string): string {
   const lines = [
     `Timeline generated for "${timeline.projectName}".`,
     `Span: ${timeline.startDate} → ${timeline.endDate} (${timeline.tasks.length} tasks, ${timeline.phases.length} phases).`,
@@ -120,10 +121,16 @@ function renderTimeline(timeline: Timeline): string {
   if (timeline.criticalPath.length > 0) {
     lines.push(`Critical path: ${timeline.criticalPath.join(' → ')}`)
   }
+  if (statePath) lines.push(`Saved to: ${statePath}`)
   lines.push('')
   lines.push('Canonical timeline JSON (pass this to pm.timeline.update / pm.timeline.export):')
   lines.push(JSON.stringify(timeline, null, 2))
   return lines.join('\n')
+}
+
+/** Resolve the workspace directory from the executing agent's session, else the process cwd. */
+function resolveCwd(exec: ToolRunContext): string {
+  return exec.agent?.session?.header?.cwd ?? process.cwd()
 }
 
 function normalizeDefinition(raw: ProjectDefinition): { definition: ProjectDefinition; issues: string[] } {
@@ -174,21 +181,33 @@ export const defineProjectTool = defineTool({
   output: {
     schema: { type: 'json' },
     render: (_args, value) => {
-      const { definition, issues } = value as unknown as { definition: ProjectDefinition; issues: string[] }
+      const { definition, issues, statePath } = value as unknown as {
+        definition: ProjectDefinition
+        issues: string[]
+        statePath?: string
+      }
       const lines = [
         `Definition accepted for "${definition.name}".`,
         `${definition.features.length} feature(s), ${definition.milestones?.length ?? 0} milestone(s).`,
       ]
       for (const issue of issues) lines.push(`Issue: ${issue}`)
+      if (statePath) lines.push(`Saved to: ${statePath}`)
       lines.push('')
       lines.push('Canonical definition JSON:')
       lines.push(JSON.stringify(definition, null, 2))
       return [{ type: 'text', text: lines.join('\n') }]
     },
   },
-  isConcurrencySafe: () => true,
-  async execute(args) {
-    return normalizeDefinition(args.definition as ProjectDefinition) as unknown as JsonValue
+  async execute(args, exec) {
+    const { definition, issues } = normalizeDefinition(args.definition as ProjectDefinition)
+    const cwd = resolveCwd(exec)
+    const existing = await loadProject(cwd)
+    const statePath = await saveProject(cwd, {
+      definition,
+      timeline: existing?.timeline,
+      updatedAt: new Date().toISOString(),
+    })
+    return { definition, issues, statePath } as unknown as JsonValue
   },
 })
 
@@ -204,16 +223,20 @@ export const generateTimelineTool = defineTool({
   },
   output: {
     schema: { type: 'json' },
-    render: (_args, value) => [{ type: 'text', text: renderTimeline(value as unknown as Timeline) }],
+    render: (_args, value) => {
+      const { timeline, statePath } = value as unknown as { timeline: Timeline; statePath?: string }
+      return [{ type: 'text', text: renderTimeline(timeline, statePath) }]
+    },
   },
-  isConcurrencySafe: () => true,
- async execute(args) {
-    const timeline = schedule(
-      args.definition as ProjectDefinition,
-      args.tasks as TaskInput[],
-      args.hoursPerDay ?? 8,
-    )
-    return { timeline } as unknown as JsonValue
+  async execute(args, exec) {
+    const definition = args.definition as ProjectDefinition
+    const timeline = schedule(definition, args.tasks as TaskInput[], args.hoursPerDay ?? 8)
+    const statePath = await saveProject(resolveCwd(exec), {
+      definition,
+      timeline,
+      updatedAt: new Date().toISOString(),
+    })
+    return { timeline, statePath } as unknown as JsonValue
   },
 })
 
@@ -230,14 +253,17 @@ export const updateTimelineTool = defineTool({
   output: {
     schema: { type: 'json' },
     render: (_args, value) => {
-      const { timeline, skippedIds } = value as unknown as { timeline: Timeline; skippedIds: string[] }
-      const text = renderTimeline(timeline)
+      const { timeline, skippedIds, statePath } = value as unknown as {
+        timeline: Timeline
+        skippedIds: string[]
+        statePath?: string
+      }
+      const text = renderTimeline(timeline, statePath)
       const skipped = skippedIds.length > 0 ? `\nSkipped unknown task ids: ${skippedIds.join(', ')}` : ''
       return [{ type: 'text', text: `${text}${skipped}` }]
     },
   },
-  isConcurrencySafe: () => true,
-  async execute(args) {
+  async execute(args, exec) {
     const timeline = args.timeline as unknown as Timeline
     const definition = args.definition as unknown as ProjectDefinition | undefined
     const skippedIds: string[] = []
@@ -285,7 +311,55 @@ export const updateTimelineTool = defineTool({
       inputs,
       timeline.hoursPerDay,
     )
-    return { timeline: scheduled, skippedIds } as unknown as JsonValue
+    const cwd = resolveCwd(exec)
+    const existing = await loadProject(cwd)
+    const statePath = await saveProject(cwd, {
+      definition: definition ?? existing?.definition ?? { name: timeline.projectName, features: [] },
+      timeline: scheduled,
+      updatedAt: new Date().toISOString(),
+    })
+    return { timeline: scheduled, skippedIds, statePath } as unknown as JsonValue
+  },
+})
+
+/** pm.project.load — pull the saved project (definition + timeline) into the session. */
+export const loadProjectTool = defineTool({
+  name: 'pm.project.load',
+  description:
+    'Load the saved project (definition + timeline) from the workspace project file (.dsh-pm/project.json). Use at the start of a session when the timeline reminder appears, or whenever the user wants to continue an existing plan.',
+  parameters: {
+    cwd: { type: 'string', description: 'Optional explicit directory; defaults to the session workspace' },
+  },
+  output: {
+    schema: { type: 'json' },
+    render: (_args, value) => {
+      const { state, loaded } = value as unknown as { state?: ProjectState; loaded: boolean }
+      if (!loaded || !state) {
+        return [{
+          type: 'text',
+          text: 'No saved project found in this workspace. Run the project interview to create one.',
+        }]
+      }
+      const timeline = state.timeline
+      const lines = [`Loaded project "${state.definition.name}" (updated ${state.updatedAt}).`]
+      if (timeline) {
+        lines.push(
+          `Timeline: ${timeline.startDate} → ${timeline.endDate} (${timeline.tasks.length} tasks), ` +
+            `feasible: ${timeline.feasible ? 'yes' : 'no'}.`,
+        )
+        for (const conflict of timeline.conflicts) lines.push(`Conflict: ${conflict}`)
+      } else {
+        lines.push('No timeline yet — call pm.timeline.generate from this definition.')
+      }
+      lines.push('')
+      lines.push('Canonical state JSON:')
+      lines.push(JSON.stringify(state, null, 2))
+      return [{ type: 'text', text: lines.join('\n') }]
+    },
+  },
+  async execute(args, exec) {
+    const state = await loadProject(args.cwd ?? resolveCwd(exec))
+    return { state, loaded: state !== undefined } as unknown as JsonValue
   },
 })
 
@@ -313,14 +387,14 @@ export const exportTimelineTool = defineTool({
       }]
     },
   },
-  async execute(args) {
+  async execute(args, exec) {
     const definition = args.definition as unknown as ProjectDefinition
     const timeline = args.timeline as unknown as Timeline
     const buffer = args.format === 'docx'
       ? await buildDocx(definition, timeline)
       : await buildXlsx(definition, timeline)
     const filename = args.path ?? `${slugify(timeline.projectName)}.${args.format}`
-    const target = isAbsolute(filename) ? filename : resolve(process.cwd(), filename)
+    const target = isAbsolute(filename) ? filename : resolve(resolveCwd(exec), filename)
     await mkdir(dirname(target), { recursive: true })
     await writeFile(target, buffer)
     return { path: target, format: args.format, sizeBytes: buffer.length }
