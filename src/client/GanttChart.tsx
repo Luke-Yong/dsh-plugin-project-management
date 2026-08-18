@@ -7,7 +7,8 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import type { WireTimelineTask, TaskDateUpdate } from './contracts.js'
-import { BRAND, hexToRgba, phaseColor } from './colors.js'
+import { hexToRgba, phaseColor } from './colors.js'
+import { useThemeColors } from './theme.js'
 
 /**
  * Minimal client-side Gantt derived from `ProjectStateWire.timeline`.
@@ -185,56 +186,11 @@ function buildTicks(
   }
 }
 
-const wrap: CSSProperties = {
-  border: `1px solid ${BRAND.line}`,
-  borderRadius: '8px',
-  background: BRAND.bandA,
-  overflow: 'hidden',
-}
-
-const toolbar: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  padding: '6px 8px',
-  borderBottom: `1px solid ${BRAND.line}`,
-}
-
-const seg: CSSProperties = {
-  display: 'inline-flex',
-  border: `1px solid ${BRAND.line}`,
-  borderRadius: '6px',
-  overflow: 'hidden',
-}
-
-const segButton: CSSProperties = {
-  font: 'inherit',
-  fontSize: 11,
-  padding: '2px 10px',
-  cursor: 'pointer',
-  border: 'none',
-  background: 'transparent',
-  color: BRAND.primary,
-}
-
-const segActive: CSSProperties = { background: BRAND.primary, color: '#fff' }
-
-const scroll: CSSProperties = {
-  overflow: 'auto',
-  padding: '8px',
-}
-
-const row: CSSProperties = {
-  display: 'flex',
-  fontSize: FONT,
-  color: BRAND.ink,
-  borderBottom: `1px solid ${BRAND.line}`,
-}
-
 /** Sticky name cell that stays visible while the timeline scrolls horizontally. */
-function NameCell({ width, background, title, children }: {
+function NameCell({ width, background, line, title, children }: {
   width: number
   background: string
+  line: string
   title?: string
   children: ReactNode
 }): ReactElement {
@@ -252,7 +208,7 @@ function NameCell({ width, background, title, children }: {
         whiteSpace: 'nowrap',
         lineHeight: `${ROW_H}px`,
         background,
-        borderRight: `1px solid ${BRAND.line}`,
+        borderRight: `1px solid ${line}`,
       }}
     >
       {children}
@@ -278,6 +234,44 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
   useEffect(() => {
     setTasks(timeline.tasks)
   }, [timeline.tasks])
+
+  const c = useThemeColors()
+  const wrapStyle: CSSProperties = {
+    border: `1px solid ${c.line}`,
+    borderRadius: '8px',
+    background: c.bandA,
+    overflow: 'hidden',
+  }
+  const toolbarStyle: CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '6px 8px',
+    borderBottom: `1px solid ${c.line}`,
+  }
+  const segStyle: CSSProperties = {
+    display: 'inline-flex',
+    border: `1px solid ${c.line}`,
+    borderRadius: '6px',
+    overflow: 'hidden',
+  }
+  const segButtonStyle: CSSProperties = {
+    font: 'inherit',
+    fontSize: 11,
+    padding: '2px 10px',
+    cursor: 'pointer',
+    border: 'none',
+    background: 'transparent',
+    color: c.primary,
+  }
+  const segActiveStyle: CSSProperties = { background: c.primary, color: '#fff' }
+  const scrollStyle: CSSProperties = { overflow: 'auto', padding: '8px' }
+  const rowStyle: CSSProperties = {
+    display: 'flex',
+    fontSize: FONT,
+    color: c.ink,
+    borderBottom: `1px solid ${c.line}`,
+  }
 
   const start = parseIso(timeline.startDate)
   const end = parseIso(timeline.endDate)
@@ -364,31 +358,31 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
   const showToday = todayLeft >= 0 && todayLeft <= timelineW
 
   return (
-    <div style={wrap}>
-      <div style={toolbar}>
-        <span style={{ fontSize: 11, color: BRAND.muted, fontWeight: 600 }}>Zoom</span>
-        <div style={seg} role="group" aria-label="Timeline zoom">
+    <div style={wrapStyle}>
+      <div style={toolbarStyle}>
+        <span style={{ fontSize: 11, color: c.muted, fontWeight: 600 }}>Zoom</span>
+        <div style={segStyle} role="group" aria-label="Timeline zoom">
           {ZOOM_ORDER.map((level) => (
             <button
               key={level}
               type="button"
               onClick={() => setZoom(level)}
-              style={zoom === level ? { ...segButton, ...segActive } : segButton}
+              style={zoom === level ? { ...segButtonStyle, ...segActiveStyle } : segButtonStyle}
             >
               {ZOOM_LABEL[level]}
             </button>
           ))}
         </div>
         {editable && (
-          <span style={{ fontSize: 11, color: BRAND.muted }}>Drag bars to reschedule</span>
+          <span style={{ fontSize: 11, color: c.muted }}>Drag bars to reschedule</span>
         )}
       </div>
 
-      <div style={{ ...scroll, maxHeight }}>
+      <div style={{ ...scrollStyle, maxHeight }}>
         <div style={{ width: nameWidth + timelineW, minWidth: nameWidth + 400 }}>
           {/* Ruler header */}
-          <div style={{ ...row, background: BRAND.bandA, borderBottom: `2px solid ${BRAND.line}` }}>
-            <NameCell width={nameWidth} background={BRAND.bandA}>Task</NameCell>
+          <div style={{ ...rowStyle, background: c.bandA, borderBottom: `2px solid ${c.line}` }}>
+            <NameCell width={nameWidth} background={c.bandA} line={c.line}>Task</NameCell>
             <div style={{ position: 'relative', flex: 1, height: rulerH }}>
               {ticks.coarse.map((tick, index) => (
                 <div
@@ -403,9 +397,9 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
                     paddingLeft: 4,
                     fontSize: 10,
                     fontWeight: 700,
-                    color: BRAND.ink,
+                    color: c.ink,
                     lineHeight: '16px',
-                    borderLeft: `1px solid ${BRAND.line}`,
+                    borderLeft: `1px solid ${c.line}`,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -427,9 +421,9 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
                     paddingLeft: 3,
                     fontSize: 9,
                     fontWeight: tick.strong ? 700 : 400,
-                    color: tick.strong ? BRAND.ink : BRAND.muted,
+                    color: tick.strong ? c.ink : c.muted,
                     lineHeight: '12px',
-                    borderLeft: `1px solid ${hexToRgba(BRAND.ink, 0.1)}`,
+                    borderLeft: `1px solid ${hexToRgba(c.ink, 0.1)}`,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -443,8 +437,8 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
 
           {/* Phase bands */}
           {timeline.phases !== undefined && timeline.phases.length > 0 && (
-            <div style={{ ...row, background: BRAND.bandB }}>
-              <NameCell width={nameWidth} background={BRAND.bandB}>Phases</NameCell>
+            <div style={{ ...rowStyle, background: c.bandB }}>
+              <NameCell width={nameWidth} background={c.bandB} line={c.line}>Phases</NameCell>
               <div style={{ position: 'relative', flex: 1, height: ROW_H }}>
                 {timeline.phases.map((phase, index) => {
                   const phaseStart = parseIso(phase.start)
@@ -487,7 +481,7 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
           {/* Task rows */}
           <div style={{ position: 'relative' }}>
             {bars.map(({ task, leftPx, widthPx, color }, index) => {
-              const bg = index % 2 === 0 ? BRAND.bandA : BRAND.bandB
+              const bg = index % 2 === 0 ? c.bandA : c.bandB
               const isDragging = drag?.id === task.id
               const edgeHandle: CSSProperties = {
                 position: 'absolute',
@@ -498,8 +492,8 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
                 touchAction: 'none',
               }
               return (
-                <div key={task.id} style={{ ...row, background: bg }}>
-                  <NameCell width={nameWidth} background={bg} title={task.name}>{task.name}</NameCell>
+                <div key={task.id} style={{ ...rowStyle, background: bg }}>
+                  <NameCell width={nameWidth} background={bg} line={c.line} title={task.name}>{task.name}</NameCell>
                   <div style={{ position: 'relative', flex: 1, height: ROW_H }}>
                     <div
                       title={`${task.name} (${task.start} → ${task.end})`}
@@ -526,9 +520,9 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
                         cursor: editable ? 'move' : undefined,
                         touchAction: editable ? 'none' : undefined,
                         boxShadow: isDragging
-                          ? `0 0 0 2px ${BRAND.primaryDark}`
+                          ? `0 0 0 2px ${c.primaryDark}`
                           : task.critical
-                            ? `0 0 0 2px ${BRAND.ink}`
+                            ? `0 0 0 2px ${c.ink}`
                             : '0 1px 2px rgba(41, 42, 45, 0.25)',
                       }}
                     >
@@ -558,7 +552,7 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
             })}
 
             {bars.length === 0 && (
-              <div style={{ ...row, color: BRAND.muted, justifyContent: 'center', padding: '8px 0' }}>
+              <div style={{ ...rowStyle, color: c.muted, justifyContent: 'center', padding: '8px 0' }}>
                 No tasks scheduled yet.
               </div>
             )}
@@ -578,13 +572,13 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
               {ticks.fine.map((tick, index) => (
                 <div
                   key={`g${index}`}
-                  style={{ position: 'absolute', left: tick.left, top: 0, bottom: 0, width: 1, background: hexToRgba(BRAND.ink, 0.08) }}
+                  style={{ position: 'absolute', left: tick.left, top: 0, bottom: 0, width: 1, background: hexToRgba(c.ink, 0.08) }}
                 />
               ))}
               {ticks.coarse.map((tick, index) => (
                 <div
                   key={`G${index}`}
-                  style={{ position: 'absolute', left: tick.left, top: 0, bottom: 0, width: 1, background: BRAND.line }}
+                  style={{ position: 'absolute', left: tick.left, top: 0, bottom: 0, width: 1, background: c.line }}
                 />
               ))}
             </div>
@@ -603,7 +597,7 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
                     top: 6,
                     width: 10,
                     height: 10,
-                    background: BRAND.primaryDark,
+                    background: c.primaryDark,
                     border: '1px solid #fff',
                     transform: 'rotate(45deg)',
                     borderRadius: 2,
@@ -624,7 +618,7 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
                   top: 0,
                   bottom: 0,
                   width: 2,
-                  background: BRAND.danger,
+                  background: c.danger,
                   zIndex: 3,
                   pointerEvents: 'none',
                 }}
@@ -633,7 +627,7 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
           </div>
 
           {/* Legend */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', padding: '8px 4px 0', fontSize: 11, color: BRAND.muted }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', padding: '8px 4px 0', fontSize: 11, color: c.muted }}>
             {timeline.phases?.map((phase, index) => (
               <span key={phase.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                 <span style={{ width: 12, height: 8, borderRadius: 2, background: phaseColor(index), display: 'inline-block' }} />
@@ -641,15 +635,15 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
               </span>
             ))}
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 12, height: 8, borderRadius: 2, background: BRAND.ink, display: 'inline-block' }} />
+              <span style={{ width: 12, height: 8, borderRadius: 2, background: c.ink, display: 'inline-block' }} />
               Critical
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 8, height: 8, background: BRAND.primaryDark, transform: 'rotate(45deg)', borderRadius: 1, display: 'inline-block' }} />
+              <span style={{ width: 8, height: 8, background: c.primaryDark, transform: 'rotate(45deg)', borderRadius: 1, display: 'inline-block' }} />
               Milestone
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 0, borderLeft: `2px solid ${BRAND.danger}`, height: 10, display: 'inline-block' }} />
+              <span style={{ width: 0, borderLeft: `2px solid ${c.danger}`, height: 10, display: 'inline-block' }} />
               Today
             </span>
           </div>
