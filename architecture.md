@@ -49,7 +49,7 @@ hand.
 | `src/tools.ts` | `defineTool` declarations: schemas, output renderers, `execute` bodies |
 | `src/scheduler.ts` | Pure scheduling: dependencies, workdays, pins, critical path, feasibility |
 | `src/export.ts` | Pure builders: Word (`docx`) and Excel (`exceljs`) |
-| `src/state.ts` | Workspace persistence: `.dsh-pm/project.json` read/write |
+| `src/state.ts` | Workspace persistence: `data/project_management/project_data.json` read/write |
 | `src/types.ts` | `ProjectDefinition`, `Timeline`, `BudgetModel`, `Feature`, … |
 | `src/date.ts` | ISO date math that skips weekends |
 | `src/skills/project-interview.ts` | The `project-interview` skill body (markdown) |
@@ -154,20 +154,31 @@ duration** → constraints. When the definition is complete the agent calls
 
 ## Storage model
 
-**The timeline is stored in a workspace project file: `<cwd>/.dsh-pm/project.json`.**
+**The project plan is stored at `<workspace>/data/project_management/project_data.json`**
+— the project-plan document schema consumed by `templates/gantt.html` (the
+host app serves it verbatim at `/api/project-plan`). The document carries:
+
+- `project` (name, dates, duration, reporting cadence, sprint days)
+- `user_tiers`, `phases` (with brand colors), `tasks` (tier / sprint /
+  dependencies / owner), `milestones`, `sprints`
+- a `_dsh` block with the plugin's own round-trip state (definition +
+  timeline + `updatedAt`); the gantt renderer ignores it.
 
 - The workspace directory is resolved from the executing agent's session
   (`agent.session.header.cwd`, set when the session was created), falling back
   to `process.cwd()` for headless/direct calls.
 - `pm.project.define` writes the definition; `pm.timeline.generate` and
   `pm.timeline.update` write the definition + timeline. Writes are atomic
-  (write-to-temp then rename).
+  (write-to-temp then rename) and always produce the journey schema (see
+  `src/project-plan.ts` for the mapping and sprint computation).
 - The file survives across sessions: a new session in the same workspace can
   call `pm.project.load` to pull the definition and timeline back into the
-  conversation.
+  conversation. Loading accepts plugin-written files (via `_dsh`) and
+  foreign journey documents (reverse-mapped best-effort); a legacy
+  `.dsh-pm/project.json` is read as a fallback.
 - The harness session log remains the record of *what the model did* (every
-  tool call, argument, and result); the project file is the record of *what the
-  project is* (the current canonical state). They complement each other.
+  tool call, argument, and result); the project-plan file is the record of
+  *what the project is* (the current canonical state). They complement each other.
 
 ## Session resume reminder
 

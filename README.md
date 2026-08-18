@@ -83,12 +83,16 @@ stock web app.
 
 ## Persistence & session resume
 
-- The definition and timeline are saved to `<workspace>/.dsh-pm/project.json`
-  (the workspace is the session `cwd`).
+- The definition and timeline are saved to `<workspace>/data/project_management/project_data.json`
+  in the project-plan schema used by `templates/gantt.html` (project, tiers,
+  phases, tasks, milestones, sprints — plus a `_dsh` block for plugin
+  round-trip state). Layout follows the Project-Journey Planner example:
+   `data/project_management/project_data.json` consumed by `templates/gantt.html`.
 - On a new session in the same workspace, the plugin injects a reminder into
   the model context when a timeline exists, telling the agent about the saved
   plan and its conflicts; the agent then calls `pm.project.load` to continue.
-- Writes are atomic (temp file + rename).
+- Writes are atomic (temp file + rename). A legacy `.dsh-pm/project.json` is
+  read as a fallback for backward compatibility.
 
 ## Notes / MVP limitations
 

@@ -142,7 +142,7 @@ export function ProjectManagementView({ sessionId }: ProjectManagementViewProps)
 
           <p style={{ ...MUTED, marginTop: '12px' }}>
             Re-run the interview or adjust the timeline in chat; the pane reads the saved
-            .dsh-pm/project.json.
+            data/project_management/project_data.json.
           </p>
         </div>
       )}

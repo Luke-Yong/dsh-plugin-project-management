@@ -24,6 +24,10 @@ export interface TaskInput {
   pinnedStart?: string
   /** Manual end override (ISO date). Kept as-is by the scheduler. */
   pinnedEnd?: string
+  /** Optional access tier id for the project-plan document. */
+  tier?: string
+  /** Optional owner for the project-plan document. */
+  owner?: string
 }
 
 interface Resolved {
@@ -148,6 +152,8 @@ export function schedule(definition: ProjectDefinition, tasks: TaskInput[], hour
       status: 'planned',
       pinned: Boolean(t.pinnedStart || t.pinnedEnd),
       critical: criticalIds.has(t.id),
+      tier: t.tier,
+      owner: t.owner,
     }
   })
 

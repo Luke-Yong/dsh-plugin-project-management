@@ -28,6 +28,13 @@ export interface BudgetModel {
   allocations?: BudgetAllocation[]
 }
 
+/** One access tier in the project-plan document (e.g. public / manager / admin). */
+export interface ProjectTier {
+  id: string
+  name: string
+  description?: string
+}
+
 export interface Milestone {
   name: string
   /** ISO date (YYYY-MM-DD). */
@@ -48,6 +55,14 @@ export interface ProjectDefinition {
   features: Feature[]
   constraints?: string[]
   notes?: string
+  /** Access tiers for the project-plan document (default: single "Team"). */
+  tiers?: ProjectTier[]
+  /** Task owners (default: "Team"). */
+  owners?: string[]
+  /** Reporting cadence for the project-plan document (default "bi-weekly"). */
+  reportingCadence?: string
+  /** Sprint length in days (default 14). */
+  sprintDays?: number
 }
 
 /** A scheduled work package inside a timeline. */
@@ -68,6 +83,10 @@ export interface TimelineTask {
   pinned?: boolean
   /** Whether the task lies on the critical path. */
   critical: boolean
+  /** Optional access tier id for the project-plan document. */
+  tier?: string
+  /** Optional owner for the project-plan document. */
+  owner?: string
 }
 
 export interface PhaseWindow {

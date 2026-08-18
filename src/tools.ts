@@ -73,6 +73,22 @@ const definitionSchema = {
     },
     constraints: { type: 'array', items: { type: 'string' } },
     notes: { type: 'string' },
+    tiers: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          id: { type: 'string', required: true },
+          name: { type: 'string', required: true },
+          description: { type: 'string' },
+        },
+      },
+      description: 'Access tiers for the project-plan document (default: single Team)',
+    },
+    owners: { type: 'array', items: { type: 'string' }, description: 'Task owners (default: Team)' },
+    reportingCadence: { type: 'string', description: 'Reporting cadence, e.g. bi-weekly (default bi-weekly)' },
+    sprintDays: { type: 'integer', description: 'Sprint length in days (default 14)' },
   },
 } as const
 
@@ -88,6 +104,8 @@ const taskSchema = {
     agents: { type: 'integer', description: 'Parallel agents assigned (default 1)' },
     pinnedStart: { type: 'string', description: 'Manual start override (YYYY-MM-DD)' },
     pinnedEnd: { type: 'string', description: 'Manual end override (YYYY-MM-DD)' },
+    tier: { type: 'string', description: 'Access tier id for the project-plan document' },
+    owner: { type: 'string', description: 'Owner for the project-plan document' },
   },
 } as const
 
@@ -326,7 +344,7 @@ export const updateTimelineTool = defineTool({
 export const loadProjectTool = defineTool({
   name: 'pm.project.load',
   description:
-    'Load the saved project (definition + timeline) from the workspace project file (.dsh-pm/project.json). Use at the start of a session when the timeline reminder appears, or whenever the user wants to continue an existing plan.',
+    'Load the saved project (definition + timeline) from the workspace project-plan file (data/project_management/project_data.json). Use at the start of a session when the timeline reminder appears, or whenever the user wants to continue an existing plan.',
   parameters: {
     cwd: { type: 'string', description: 'Optional explicit directory; defaults to the session workspace' },
   },

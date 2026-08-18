@@ -47,6 +47,12 @@ Record BOTH the unit and the period (per week / per month / per phase) in
 Teams, approvals, holidays, dependencies on other projects — anything that
 changes dates or effort. Record in \`constraints\`.
 
+### 5. Reporting & teams (optional)
+- \`reportingCadence\` (e.g. "bi-weekly") and \`sprintDays\` (e.g. 14) for the
+  project-plan document.
+- \`tiers\` (access tiers, e.g. public / content manager / administrator) and
+  \`owners\` (who owns each task). Defaults: a single "Team" tier and owner.
+
 ## Finish
 When the definition is complete, call \`pm.project.define\` with the full definition:
 
@@ -64,7 +70,11 @@ When the definition is complete, call \`pm.project.define\` with the full defini
   "features": [
     { "id": "auth", "title": "User login", "priority": "must", "phase": "foundation", "effortDays": 3 }
   ],
-  "constraints": ["Single reviewer for UI changes"]
+  "constraints": ["Single reviewer for UI changes"],
+  "tiers": [{ "id": "team", "name": "Team" }],
+  "owners": ["Team"],
+  "reportingCadence": "bi-weekly",
+  "sprintDays": 14
 }
 \`\`\`
 
