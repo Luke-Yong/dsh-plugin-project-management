@@ -1,5 +1,12 @@
-import { useState, type CSSProperties, type ReactElement, type ReactNode } from 'react'
-import type { WireTimelineTask } from './contracts.js'
+import {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type ReactElement,
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
+import type { WireTimelineTask, TaskDateUpdate } from './contracts.js'
 import { BRAND, hexToRgba, phaseColor } from './colors.js'
 
 /**
@@ -38,6 +45,12 @@ export interface GanttChartProps {
   nameWidth?: number
   /** Cap the chart height so long timelines scroll vertically instead of growing. */
   maxHeight?: number
+  /**
+   * When provided, task bars become draggable (move, resize from either
+   * edge) and each completed drag commits a date change through this
+   * callback. Omit for a read-only chart.
+   */
+  onCommit?: (updates: TaskDateUpdate[]) => Promise<void> | void
 }
 
 const NAME_W = 150
@@ -57,6 +70,14 @@ function diffDays(a: Date, b: Date): number {
 function todayIso(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function isoFromDate(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
 }
 
 interface TickRange {
@@ -239,8 +260,24 @@ function NameCell({ width, background, title, children }: {
   )
 }
 
-export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight }: GanttChartProps): ReactElement {
+interface DragState {
+  id: string
+  mode: 'move' | 'start' | 'end'
+  startX: number
+  baseStart: string
+  baseEnd: string
+}
+
+export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCommit }: GanttChartProps): ReactElement {
   const [zoom, setZoom] = useState<ZoomLevel>('week')
+
+  // Local copy of tasks so a drag previews before the server round-trip; the
+  // prop array changes identity after a commit/refetch and re-syncs this.
+  const [tasks, setTasks] = useState<WireTimelineTask[]>(timeline.tasks)
+  const [drag, setDrag] = useState<DragState | undefined>()
+  useEffect(() => {
+    setTasks(timeline.tasks)
+  }, [timeline.tasks])
 
   const start = parseIso(timeline.startDate)
   const end = parseIso(timeline.endDate)
@@ -255,7 +292,7 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight }: GanttCha
     if (!phaseIndex.has(phase.name)) phaseIndex.set(phase.name, index)
   })
 
-  const bars = timeline.tasks.map((task) => {
+  const bars = tasks.map((task) => {
     const taskStart = parseIso(task.start)
     const taskEnd = parseIso(task.end)
     const leftPx = Math.max(0, Math.round(diffDays(start, taskStart) * px))
@@ -267,6 +304,60 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight }: GanttCha
       color: phaseColor(phaseIndex.get(task.phase) ?? 0),
     }
   })
+
+  const editable = onCommit !== undefined
+
+  function applyDrag(pointerX: number): void {
+    if (drag === undefined) return
+    const delta = Math.round((pointerX - drag.startX) / px)
+    const baseStartIdx = diffDays(start, parseIso(drag.baseStart))
+    const baseEndIdx = diffDays(start, parseIso(drag.baseEnd))
+    const lastIdx = totalDays - 1
+    let newStartIdx = baseStartIdx
+    let newEndIdx = baseEndIdx
+    if (drag.mode === 'move') {
+      const shift = clamp(delta, -baseStartIdx, lastIdx - baseEndIdx)
+      newStartIdx = baseStartIdx + shift
+      newEndIdx = baseEndIdx + shift
+    } else if (drag.mode === 'start') {
+      newStartIdx = clamp(baseStartIdx + delta, 0, baseEndIdx - 1)
+    } else {
+      newEndIdx = clamp(baseEndIdx + delta, baseStartIdx + 1, lastIdx)
+    }
+    const newStart = isoFromDate(new Date(start.getTime() + newStartIdx * DAY_MS))
+    const newEnd = isoFromDate(new Date(start.getTime() + newEndIdx * DAY_MS))
+    setTasks((prev) => prev.map((t) => (t.id === drag.id ? { ...t, start: newStart, end: newEnd } : t)))
+  }
+
+  function startDrag(task: WireTimelineTask, mode: DragState['mode']) {
+    return (e: ReactPointerEvent<HTMLDivElement>): void => {
+      if (!editable) return
+      e.preventDefault()
+      e.stopPropagation()
+      e.currentTarget.setPointerCapture(e.pointerId)
+      setDrag({ id: task.id, mode, startX: e.clientX, baseStart: task.start, baseEnd: task.end })
+    }
+  }
+
+  function moveDrag(taskId: string) {
+    return (e: ReactPointerEvent<HTMLDivElement>): void => {
+      if (drag === undefined || drag.id !== taskId) return
+      e.preventDefault()
+      applyDrag(e.clientX)
+    }
+  }
+
+  function endDrag(taskId: string) {
+    return (e: ReactPointerEvent<HTMLDivElement>): void => {
+      if (drag === undefined || drag.id !== taskId) return
+      e.preventDefault()
+      const finalTask = tasks.find((t) => t.id === taskId)
+      setDrag(undefined)
+      if (finalTask !== undefined) {
+        void onCommit?.([{ id: taskId, start: finalTask.start, end: finalTask.end }])
+      }
+    }
+  }
 
   const today = todayIso()
   const todayLeft = Math.round(diffDays(start, parseIso(today)) * px)
@@ -288,9 +379,12 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight }: GanttCha
             </button>
           ))}
         </div>
+        {editable && (
+          <span style={{ fontSize: 11, color: BRAND.muted }}>Drag bars to reschedule</span>
+        )}
       </div>
 
-      <div style={maxHeight !== undefined ? { ...scroll, maxHeight } : scroll}>
+      <div style={{ ...scroll, maxHeight }}>
         <div style={{ width: nameWidth + timelineW, minWidth: nameWidth + 400 }}>
           {/* Ruler header */}
           <div style={{ ...row, background: BRAND.bandA, borderBottom: `2px solid ${BRAND.line}` }}>
@@ -394,12 +488,25 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight }: GanttCha
           <div style={{ position: 'relative' }}>
             {bars.map(({ task, leftPx, widthPx, color }, index) => {
               const bg = index % 2 === 0 ? BRAND.bandA : BRAND.bandB
+              const isDragging = drag?.id === task.id
+              const edgeHandle: CSSProperties = {
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                width: 6,
+                cursor: 'ew-resize',
+                touchAction: 'none',
+              }
               return (
                 <div key={task.id} style={{ ...row, background: bg }}>
                   <NameCell width={nameWidth} background={bg} title={task.name}>{task.name}</NameCell>
                   <div style={{ position: 'relative', flex: 1, height: ROW_H }}>
                     <div
                       title={`${task.name} (${task.start} → ${task.end})`}
+                      onPointerDown={editable ? startDrag(task, 'move') : undefined}
+                      onPointerMove={editable ? moveDrag(task.id) : undefined}
+                      onPointerUp={editable ? endDrag(task.id) : undefined}
+                      onPointerCancel={editable ? endDrag(task.id) : undefined}
                       style={{
                         position: 'absolute',
                         left: leftPx,
@@ -416,10 +523,34 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight }: GanttCha
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
                         zIndex: 2,
-                        boxShadow: task.critical ? `0 0 0 2px ${BRAND.ink}` : '0 1px 2px rgba(41, 42, 45, 0.25)',
+                        cursor: editable ? 'move' : undefined,
+                        touchAction: editable ? 'none' : undefined,
+                        boxShadow: isDragging
+                          ? `0 0 0 2px ${BRAND.primaryDark}`
+                          : task.critical
+                            ? `0 0 0 2px ${BRAND.ink}`
+                            : '0 1px 2px rgba(41, 42, 45, 0.25)',
                       }}
                     >
                       {widthPx >= 36 ? task.name : ''}
+                      {editable && (
+                        <>
+                          <div
+                            onPointerDown={startDrag(task, 'start')}
+                            onPointerMove={moveDrag(task.id)}
+                            onPointerUp={endDrag(task.id)}
+                            onPointerCancel={endDrag(task.id)}
+                            style={{ ...edgeHandle, left: 0 }}
+                          />
+                          <div
+                            onPointerDown={startDrag(task, 'end')}
+                            onPointerMove={moveDrag(task.id)}
+                            onPointerUp={endDrag(task.id)}
+                            onPointerCancel={endDrag(task.id)}
+                            style={{ ...edgeHandle, right: 0 }}
+                          />
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

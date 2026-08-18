@@ -40,6 +40,16 @@ export interface WireTimelineTask {
   start: string
   end: string
   critical?: boolean
+  owner?: string
+}
+
+/** A manual timeline adjustment committed from the client surface. */
+export interface TaskDateUpdate {
+  id: string
+  start?: string
+  end?: string
+  name?: string
+  owner?: string
 }
 
 /** Wire shape of `GET /plugins/project-management/state`. */

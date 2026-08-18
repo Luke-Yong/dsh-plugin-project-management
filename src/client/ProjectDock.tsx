@@ -1,7 +1,8 @@
 import { useEffect, useState, type CSSProperties, type ReactElement } from 'react'
-import type { ProjectStateWire } from './contracts.js'
+import type { ProjectStateWire, TaskDateUpdate } from './contracts.js'
 import { GanttChart } from './GanttChart.js'
 import { BRAND, hexToRgba } from './colors.js'
+import { fetchProjectState, updateProjectTimeline } from './api.js'
 
 export interface ProjectDockProps {
   sessionId?: string
@@ -72,11 +73,10 @@ export function ProjectDock({ sessionId }: ProjectDockProps): ReactElement | nul
   useEffect(() => {
     if (!sessionId) return
     let cancelled = false
-    void fetch(`/plugins/project-management/state?session=${encodeURIComponent(sessionId)}`)
-      .then((res) => (res.ok ? res.json() : undefined))
+    void fetchProjectState(sessionId)
       .then((data) => {
         if (cancelled) return
-        setState(data as ProjectStateWire | undefined)
+        setState(data)
         setLoaded(true)
       })
       .catch(() => {
@@ -89,6 +89,12 @@ export function ProjectDock({ sessionId }: ProjectDockProps): ReactElement | nul
 
   const timeline = state?.timeline
   if (loaded && (state === undefined || dismissed)) return null
+
+  const handleCommit = async (updates: TaskDateUpdate[]): Promise<void> => {
+    if (!sessionId) return
+    const next = await updateProjectTimeline(sessionId, updates)
+    if (next !== undefined) setState(next)
+  }
 
   return (
     <div style={DOCK_STYLE}>
@@ -127,7 +133,12 @@ export function ProjectDock({ sessionId }: ProjectDockProps): ReactElement | nul
             </div>
           )}
           {view === 'gantt' && timeline !== undefined && timeline.tasks.length > 0 ? (
-            <GanttChart timeline={timeline} nameWidth={120} maxHeight={360} />
+            <GanttChart
+              timeline={timeline}
+              nameWidth={120}
+              maxHeight={360}
+              onCommit={handleCommit}
+            />
           ) : (
             <div style={{ display: 'grid', gap: '2px' }}>
               <div style={{ color: BRAND.ink }}>

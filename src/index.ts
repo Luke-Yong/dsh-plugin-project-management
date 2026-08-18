@@ -2,7 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { PROJECT_INTERVIEW_SKILL, type SkillRegistrationLike } from './skills/project-interview.js'
 import { loadProjectSync, projectStatePath } from './state.js'
 import { setWorkspaceRegistry } from './tools.js'
-import { registerProjectStateRoute, type SessionStoreLike, type WebServerLike } from './web.js'
+import { registerProjectStateRoute, registerProjectTimelineUpdateRoute, type SessionStoreLike, type WebServerLike } from './web.js'
 import { resolveCwdForSession, type WorkspaceRegistryLike } from './workspace.js'
 import {
   defineProjectTool,
@@ -96,12 +96,15 @@ export function apply(ctx: Context) {
     })
   }
 
-  // Optional dependency: serve the saved project state to the web pane.
+  // Optional dependency: serve the saved project state to the web pane and
+  // accept manual timeline adjustments from the client surfaces.
   const webServer = ctx.get('webServer') as WebServerLike | undefined
   if (webServer) {
-    registerProjectStateRoute(webServer, {
+    const webOptions = {
       sessions: ctx.get('sessions') as SessionStoreLike | undefined,
       workspaceRegistry,
-    })
+    }
+    registerProjectStateRoute(webServer, webOptions)
+    registerProjectTimelineUpdateRoute(webServer, webOptions)
   }
 }
