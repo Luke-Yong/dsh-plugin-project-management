@@ -49,7 +49,13 @@ export function ProjectDock({ sessionId }: ProjectDockProps): ReactElement | nul
   const handleCommit = async (updates: TaskDateUpdate[]): Promise<void> => {
     if (!sessionId) return
     const next = await updateProjectTimeline(sessionId, updates)
-    if (next !== undefined) setState(next)
+    if (next !== undefined) {
+      setState(next)
+    } else {
+      // Commit failed — revert the optimistic drag to the persisted state.
+      const current = await fetchProjectState(sessionId)
+      if (current !== undefined) setState(current)
+    }
   }
 
   const dockStyle: CSSProperties = {

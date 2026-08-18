@@ -11,19 +11,17 @@ export async function fetchProjectState(sessionId: string): Promise<ProjectState
 }
 
 /**
- * Apply manual timeline adjustments. The server re-schedules with the
- * changed dates pinned and persists to the project data file; the response is
- * the fresh state (or `undefined` on failure).
+ * Apply manual timeline adjustments. The harness plugin web layer only serves
+ * GET, so the update rides as `?updates=<JSON>`; the server re-schedules with
+ * the changed dates pinned, persists to the project data file and returns the
+ * fresh state (or `undefined` on failure).
  */
 export async function updateProjectTimeline(
   sessionId: string,
   updates: TaskDateUpdate[],
 ): Promise<ProjectStateWire | undefined> {
-  const res = await fetch(`${TIMELINE_ROUTE}?session=${encodeURIComponent(sessionId)}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ updates }),
-  })
+  const params = new URLSearchParams({ session: sessionId, updates: JSON.stringify({ updates }) })
+  const res = await fetch(`${TIMELINE_ROUTE}?${params.toString()}`)
   if (!res.ok) return undefined
   return (await res.json()) as ProjectStateWire
 }

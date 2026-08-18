@@ -150,9 +150,15 @@ export function ProjectManagementView({ sessionId }: ProjectManagementViewProps)
     setSaving(true)
     const next = await updateProjectTimeline(sessionId, updates)
     setSaving(false)
-    if (next !== undefined) setState(next)
-    setEditMode(false)
-    setDraft(undefined)
+    if (next !== undefined) {
+      setState(next)
+      setEditMode(false)
+      setDraft(undefined)
+    } else {
+      // Save failed — revert to the persisted state but keep the draft open.
+      const current = await fetchProjectState(sessionId)
+      if (current !== undefined) setState(current)
+    }
   }
 
   const draftInvalid = draft !== undefined && draft.some((row) => row.start > row.end)

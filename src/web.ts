@@ -140,11 +140,13 @@ function parseTaskUpdates(payload: unknown): TaskUpdate[] | undefined {
 }
 
 /**
- * Register `POST /plugins/project-management/timeline?session=<id>` (or
- * `?path=<abs dir>`). Body: `{ "updates": [{ "id": "T3", "start": "...",
- * "end": "..." }] }`. The server applies the changes as pinned dates,
- * re-schedules (critical path / feasibility / phases recomputed), persists to
- * the project data file and returns the new state. Returns the route disposer.
+ * Register `GET|POST /plugins/project-management/timeline?session=<id>` (or
+ * `?path=<abs dir>`). The update payload arrives as `?updates=<JSON>` for
+ * GET (the harness plugin web layer rejects non-GET methods) or as a JSON
+ * body for POST. Shape: `[{ "id": "T3", "start": "...", "end": "..." }]`.
+ * The server applies the changes as pinned dates, re-schedules (critical
+ * path / feasibility / phases recomputed), persists to the project data file
+ * and returns the new state. Returns the route disposer.
  */
 export function registerProjectTimelineUpdateRoute(
   webServer: WebServerLike,
@@ -154,10 +156,6 @@ export function registerProjectTimelineUpdateRoute(
     kind: 'exact',
     path: PROJECT_TIMELINE_ROUTE,
     handler: async (req, res) => {
-      if (req.method !== 'POST') {
-        writeJson(res, 405, { error: 'method not allowed' })
-        return
-      }
       const url = new URL(req.url ?? '/', 'http://localhost')
       const { cwd, sessionId } = resolveCwd(url, options)
       if (cwd === undefined) {
@@ -173,11 +171,24 @@ export function registerProjectTimelineUpdateRoute(
         return
       }
 
+      let raw: string | undefined
+      if (req.method === 'GET' || req.method === 'HEAD') {
+        raw = url.searchParams.get('updates') ?? undefined
+      } else if (req.method === 'POST') {
+        raw = await readBody(req)
+      } else {
+        writeJson(res, 405, { error: 'method not allowed' })
+        return
+      }
+      if (raw === undefined) {
+        writeJson(res, 400, { error: 'expected ?updates=<JSON> or a JSON body' })
+        return
+      }
       let payload: unknown
       try {
-        payload = JSON.parse(await readBody(req))
+        payload = JSON.parse(raw)
       } catch {
-        writeJson(res, 400, { error: 'invalid JSON body' })
+        writeJson(res, 400, { error: 'invalid JSON payload' })
         return
       }
       const updates = parseTaskUpdates(payload)
