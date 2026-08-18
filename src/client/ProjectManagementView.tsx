@@ -1,5 +1,7 @@
 import { useEffect, useState, type CSSProperties, type ReactElement } from 'react'
 import type { ProjectStateWire } from './contracts.js'
+import { GanttChart } from './GanttChart.js'
+import { BRAND } from './colors.js'
 
 export interface ProjectManagementViewProps {
   sessionId?: string
@@ -16,17 +18,41 @@ const WRAP: CSSProperties = {
 
 const ROW: CSSProperties = { margin: '6px 0' }
 
-const MUTED: CSSProperties = { color: '#888', fontSize: '12px' }
+const MUTED: CSSProperties = { color: BRAND.muted, fontSize: '12px' }
+
+const TOGGLE_STYLE: CSSProperties = {
+  display: 'inline-flex',
+  border: `1px solid ${BRAND.line}`,
+  borderRadius: '6px',
+  overflow: 'hidden',
+  margin: '0 0 10px',
+}
+
+const TOGGLE_BUTTON: CSSProperties = {
+  font: 'inherit',
+  fontSize: 12,
+  padding: '4px 14px',
+  cursor: 'pointer',
+  border: 'none',
+  background: 'transparent',
+  color: BRAND.primary,
+}
+
+const TOGGLE_ACTIVE: CSSProperties = { background: BRAND.primary, color: '#fff' }
+
+type ViewMode = 'text' | 'gantt'
 
 /**
  * Project management view body for the `conversation.view` "Project" tab.
  * Reads the saved project state from the plugin web route for the current
- * session and renders the definition + timeline summary.
+ * session and renders the definition + timeline summary, with a segmented
+ * control to switch between the text summary and a client-side Gantt chart.
  */
 export function ProjectManagementView({ sessionId }: ProjectManagementViewProps): ReactElement {
   const [state, setState] = useState<ProjectStateWire | undefined>()
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | undefined>()
+  const [view, setView] = useState<ViewMode>('text')
 
   useEffect(() => {
     if (!sessionId) {
@@ -61,7 +87,7 @@ export function ProjectManagementView({ sessionId }: ProjectManagementViewProps)
   const timeline = state?.timeline
   return (
     <div style={WRAP}>
-      <h2 style={{ margin: '0 0 12px', fontSize: '17px' }}>Project management</h2>
+      <h2 style={{ margin: '0 0 12px', fontSize: '17px', color: BRAND.primary }}>Project management</h2>
 
       {!loaded && <p style={ROW}>Loading…</p>}
       {error !== undefined && <p style={ROW}>{error}</p>}
@@ -75,60 +101,90 @@ export function ProjectManagementView({ sessionId }: ProjectManagementViewProps)
 
       {loaded && error === undefined && state !== undefined && (
         <div>
-          <h3 style={{ margin: '0 0 4px', fontSize: '15px' }}>{state.definition.name}</h3>
+          <h3 style={{ margin: '0 0 4px', fontSize: '15px', color: BRAND.ink }}>{state.definition.name}</h3>
           {state.definition.description !== undefined && <p style={MUTED}>{state.definition.description}</p>}
           <p style={MUTED}>Updated {new Date(state.updatedAt).toLocaleString()}</p>
 
           {timeline !== undefined && (
             <div>
-              <p style={ROW}>
-                <strong>Timeline:</strong> {timeline.startDate} → {timeline.endDate} ·{' '}
-                {timeline.tasks.length} tasks ·{' '}
-                <span style={{ color: timeline.feasible ? '#2e7d32' : '#e1251b' }}>
-                  {timeline.feasible ? 'feasible' : 'not feasible'}
-                </span>
-              </p>
+              <div style={TOGGLE_STYLE}>
+                <button
+                  type="button"
+                  onClick={() => setView('text')}
+                  style={view === 'text' ? { ...TOGGLE_BUTTON, ...TOGGLE_ACTIVE } : TOGGLE_BUTTON}
+                >
+                  Text
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView('gantt')}
+                  style={view === 'gantt' ? { ...TOGGLE_BUTTON, ...TOGGLE_ACTIVE } : TOGGLE_BUTTON}
+                >
+                  Gantt
+                </button>
+              </div>
 
-              {timeline.phases !== undefined && timeline.phases.length > 0 && (
+              {view === 'gantt' ? (
                 <div style={ROW}>
-                  <strong>Phases:</strong>
-                  <ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
-                    {timeline.phases.map((phase) => (
-                      <li key={phase.name}>
-                        {phase.name}: {phase.start} → {phase.end}
-                      </li>
-                    ))}
-                  </ul>
+                  <GanttChart timeline={timeline} />
                 </div>
-              )}
+              ) : (
+                <div>
+                  <p style={ROW}>
+                    <strong>Timeline:</strong> {timeline.startDate} → {timeline.endDate} ·{' '}
+                    {timeline.tasks.length} tasks ·{' '}
+                    <span
+                      style={{
+                        color: timeline.feasible ? BRAND.success : BRAND.danger,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {timeline.feasible ? 'feasible' : 'not feasible'}
+                    </span>
+                  </p>
 
-              {timeline.criticalPath !== undefined && timeline.criticalPath.length > 0 && (
-                <p style={ROW}>
-                  <strong>Critical path:</strong> {timeline.criticalPath.join(' → ')}
-                </p>
-              )}
+                  {timeline.phases !== undefined && timeline.phases.length > 0 && (
+                    <div style={ROW}>
+                      <strong>Phases:</strong>
+                      <ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
+                        {timeline.phases.map((phase) => (
+                          <li key={phase.name}>
+                            {phase.name}: {phase.start} → {phase.end}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
-              {timeline.conflicts.length > 0 && (
-                <div style={ROW}>
-                  <strong style={{ color: '#e1251b' }}>Conflicts:</strong>
-                  <ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
-                    {timeline.conflicts.map((conflict) => (
-                      <li key={conflict} style={{ color: '#e1251b' }}>{conflict}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                  {timeline.criticalPath !== undefined && timeline.criticalPath.length > 0 && (
+                    <p style={ROW}>
+                      <strong>Critical path:</strong> {timeline.criticalPath.join(' → ')}
+                    </p>
+                  )}
 
-              {timeline.milestones !== undefined && timeline.milestones.length > 0 && (
-                <div style={ROW}>
-                  <strong>Milestones:</strong>
-                  <ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
-                    {timeline.milestones.map((milestone) => (
-                      <li key={`${milestone.name}-${milestone.date}`}>
-                        {milestone.date} — {milestone.name}
-                      </li>
-                    ))}
-                  </ul>
+                  {timeline.conflicts.length > 0 && (
+                    <div style={ROW}>
+                      <strong style={{ color: BRAND.danger }}>Conflicts:</strong>
+                      <ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
+                        {timeline.conflicts.map((conflict) => (
+                          <li key={conflict} style={{ color: BRAND.danger }}>{conflict}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {timeline.milestones !== undefined && timeline.milestones.length > 0 && (
+                    <div style={ROW}>
+                      <strong>Milestones:</strong>
+                      <ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
+                        {timeline.milestones.map((milestone) => (
+                          <li key={`${milestone.name}-${milestone.date}`}>
+                            {milestone.date} — {milestone.name}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

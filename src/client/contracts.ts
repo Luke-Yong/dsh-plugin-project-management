@@ -32,6 +32,16 @@ export interface ClientContextLike {
   slots: SlotsLike
 }
 
+/** A scheduled task as delivered on the state wire. */
+export interface WireTimelineTask {
+  id: string
+  name: string
+  phase: string
+  start: string
+  end: string
+  critical?: boolean
+}
+
 /** Wire shape of `GET /plugins/project-management/state`. */
 export interface ProjectStateWire {
   definition: {
@@ -46,7 +56,7 @@ export interface ProjectStateWire {
     feasible: boolean
     conflicts: string[]
     criticalPath?: string[]
-    tasks: unknown[]
+    tasks: WireTimelineTask[]
     phases?: { name: string; start: string; end: string }[]
     milestones?: { name: string; date: string }[]
   }

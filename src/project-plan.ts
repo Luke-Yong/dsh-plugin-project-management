@@ -8,8 +8,8 @@ import type { ProjectDefinition, Timeline } from './types.js'
  * and embeds its own round-trip state under `_dsh` (ignored by the renderer).
  */
 
-/** Brand palette used by the gantt layout. */
-const PHASE_COLORS = ['#ae852d', '#e1251b', '#53575a'] as const
+/** DeepSeek palette used by the gantt layout. */
+const PHASE_COLORS = ['#4D6BFE', '#6377DC', '#4166D5', '#8FA3F9'] as const
 
 export interface JourneyProject {
   name: string
