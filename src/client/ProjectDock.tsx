@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react'
 import type { ProjectStateWire, TaskDateUpdate } from './contracts.js'
 import { GanttChart } from './GanttChart.js'
 import { hexToRgba } from './colors.js'
@@ -12,19 +12,121 @@ export interface ProjectDockProps {
 type ViewMode = 'text' | 'gantt'
 
 /**
+ * The composer root that sizes/centers the composer card (hashed CSS-module
+ * class from the harness client). It is the card's direct parent; replicating
+ * its box model on the dock wrapper gives the dock the same width.
+ */
+const COMPOSER_ROOT_SELECTOR = '.PHRFWG_root'
+
+/** Fallback: the composer stack further up the tree (hashed CSS-module class). */
+const COMPOSER_STACK_SELECTOR = '.TFSGfa_composerStack'
+
+/** Last resort: the composer card itself (hashed CSS-module class). */
+const COMPOSER_CARD_SELECTOR = '.PHRFWG_card'
+
+/** Horizontal box model copied from the harness element that sets the width. */
+interface BoxModelCss {
+  boxSizing: string
+  width: string
+  maxWidth: string
+  paddingLeft: string
+  paddingRight: string
+  marginLeft: string
+  marginRight: string
+}
+
+/**
  * Compact project management dock for `conversation.input.dock` (order 10).
  * Complements the "Project" view tab: the composer area renders even for
  * blank/0-turn sessions, while the view-tab ring only appears once a session
  * is active. The dock auto-appears whenever a saved project exists and can be
- * dismissed locally. A segmented control switches between the text summary
- * and a client-side Gantt chart; both surfaces follow the harness theme.
+ * dismissed locally. Its width and horizontal position mirror the composer
+ * root (`PHRFWG_root`), which is what sizes the composer card, so it stays
+ * aligned as the window resizes. A segmented control switches between
+ * the text summary and a client-side Gantt chart; both surfaces follow the
+ * harness theme.
  */
 export function ProjectDock({ sessionId }: ProjectDockProps): ReactElement | null {
   const c = useThemeColors()
+  const dockRef = useRef<HTMLDivElement | null>(null)
   const [state, setState] = useState<ProjectStateWire | undefined>()
   const [loaded, setLoaded] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const [view, setView] = useState<ViewMode>('text')
+  const [stackCss, setStackCss] = useState<BoxModelCss | undefined>()
+
+  // Replicate the composer root's horizontal box model (padding, margins,
+  // width, max-width, box-sizing) on a wrapper so the dock lays out at exactly
+  // the composer card's width and centered position. Falls back to the stack
+  // and then the nearest card when the root element is not present.
+  useEffect(() => {
+    let found = false
+    let disposed = false
+    let resizeObserver: ResizeObserver | undefined
+
+    /** The element whose box model sizes the composer card. */
+    const findWidthSource = (): HTMLElement | null => {
+      for (const selector of [COMPOSER_ROOT_SELECTOR, COMPOSER_STACK_SELECTOR]) {
+        const el = document.querySelector<HTMLElement>(selector)
+        if (el !== null) return el
+      }
+      const cards = Array.from(document.querySelectorAll<HTMLElement>(COMPOSER_CARD_SELECTOR))
+      if (cards.length === 0) return null
+      const dockRect = dockRef.current?.getBoundingClientRect()
+      let best: HTMLElement = cards[0]!
+      let bestScore = Number.POSITIVE_INFINITY
+      for (const card of cards) {
+        const rect = card.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) continue
+        const score = dockRect !== undefined ? Math.abs(rect.bottom - dockRect.bottom) : rect.bottom
+        if (score < bestScore) {
+          bestScore = score
+          best = card
+        }
+      }
+      return best
+    }
+
+    const copyStackCss = (): void => {
+      if (disposed) return
+      const source = findWidthSource()
+      if (source === null) return
+      const cs = getComputedStyle(source)
+      setStackCss({
+        boxSizing: cs.boxSizing,
+        width: cs.width,
+        maxWidth: cs.maxWidth,
+        paddingLeft: cs.paddingLeft,
+        paddingRight: cs.paddingRight,
+        marginLeft: cs.marginLeft,
+        marginRight: cs.marginRight,
+      })
+    }
+
+    const trySetup = (): void => {
+      const source = findWidthSource()
+      if (source !== null && !found) {
+        found = true
+        resizeObserver = new ResizeObserver(copyStackCss)
+        resizeObserver.observe(source)
+      }
+      copyStackCss()
+    }
+
+    trySetup()
+    // The stack may mount after the dock; watch for it.
+    const watcher = new MutationObserver(() => {
+      if (!found && findWidthSource() !== null) trySetup()
+    })
+    watcher.observe(document.body, { childList: true, subtree: true })
+    window.addEventListener('resize', copyStackCss)
+    return () => {
+      disposed = true
+      watcher.disconnect()
+      resizeObserver?.disconnect()
+      window.removeEventListener('resize', copyStackCss)
+    }
+  }, [])
 
   useEffect(() => {
     if (!sessionId) return
@@ -58,13 +160,28 @@ export function ProjectDock({ sessionId }: ProjectDockProps): ReactElement | nul
     }
   }
 
+  const wrapStyle: CSSProperties = stackCss !== undefined
+    ? ({
+        boxSizing: stackCss.boxSizing,
+        width: stackCss.width,
+        maxWidth: stackCss.maxWidth,
+        paddingLeft: stackCss.paddingLeft,
+        paddingRight: stackCss.paddingRight,
+        marginLeft: stackCss.marginLeft,
+        marginRight: stackCss.marginRight,
+      } as unknown as CSSProperties)
+    : {}
+
   const dockStyle: CSSProperties = {
     border: `1px solid ${hexToRgba(c.primary, 0.35)}`,
     borderRadius: '8px',
-    margin: '4px 8px',
     padding: '8px 10px',
     fontSize: '12px',
     background: hexToRgba(c.primary, 0.05),
+    boxSizing: 'border-box',
+    ...(stackCss !== undefined
+      ? { width: 'auto', margin: '4px 20px' }
+      : { margin: '4px 8px' }),
   }
 
   const headerStyle: CSSProperties = {
@@ -105,77 +222,79 @@ export function ProjectDock({ sessionId }: ProjectDockProps): ReactElement | nul
   const toggleActive: CSSProperties = { background: c.primary, color: '#fff' }
 
   return (
-    <div style={dockStyle}>
-      <div style={headerStyle}>
-        <span>Project management</span>
-        {state !== undefined && (
-          <button
-            type="button"
-            onClick={() => setDismissed(true)}
-            title="Close"
-            style={closeStyle}
-          >
-            ✕
-          </button>
-        )}
-      </div>
-      {!loaded && <div style={{ color: c.muted }}>Loading…</div>}
-      {loaded && state !== undefined && (
-        <div style={{ display: 'grid', gap: '2px' }}>
-          {timeline !== undefined && timeline.tasks.length > 0 && (
-            <div style={toggleStyle}>
-              <button
-                type="button"
-                onClick={() => setView('text')}
-                style={view === 'text' ? { ...toggleButton, ...toggleActive } : toggleButton}
-              >
-                Text
-              </button>
-              <button
-                type="button"
-                onClick={() => setView('gantt')}
-                style={view === 'gantt' ? { ...toggleButton, ...toggleActive } : toggleButton}
-              >
-                Gantt
-              </button>
-            </div>
-          )}
-          {view === 'gantt' && timeline !== undefined && timeline.tasks.length > 0 ? (
-            <GanttChart
-              timeline={timeline}
-              nameWidth={120}
-              maxHeight={360}
-              onCommit={handleCommit}
-            />
-          ) : (
-            <div style={{ display: 'grid', gap: '2px' }}>
-              <div style={{ color: c.ink }}>
-                <strong>{state.definition.name}</strong>
-                {timeline !== undefined && (
-                  <span style={{ color: c.muted }}>
-                    {' '}· {timeline.startDate} → {timeline.endDate} ({timeline.tasks.length} tasks)
-                  </span>
-                )}
-              </div>
-              {timeline !== undefined && (
-                <div>
-                  <span
-                    style={{
-                      color: timeline.feasible ? c.success : c.danger,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {timeline.feasible ? 'Feasible' : 'Not feasible'}
-                  </span>
-                  {timeline.conflicts.map((conflict, index) => (
-                    <div key={index} style={{ color: c.danger }}>• {conflict}</div>
-                  ))}
-                </div>
-              )}
-            </div>
+    <div style={wrapStyle}>
+      <div style={dockStyle} ref={dockRef}>
+        <div style={headerStyle}>
+          <span>Project management</span>
+          {state !== undefined && (
+            <button
+              type="button"
+              onClick={() => setDismissed(true)}
+              title="Close"
+              style={closeStyle}
+            >
+              ✕
+            </button>
           )}
         </div>
-      )}
+        {!loaded && <div style={{ color: c.muted }}>Loading…</div>}
+        {loaded && state !== undefined && (
+          <div style={{ display: 'grid', gap: '2px' }}>
+            {timeline !== undefined && timeline.tasks.length > 0 && (
+              <div style={toggleStyle}>
+                <button
+                  type="button"
+                  onClick={() => setView('text')}
+                  style={view === 'text' ? { ...toggleButton, ...toggleActive } : toggleButton}
+                >
+                  Text
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView('gantt')}
+                  style={view === 'gantt' ? { ...toggleButton, ...toggleActive } : toggleButton}
+                >
+                  Gantt
+                </button>
+              </div>
+            )}
+            {view === 'gantt' && timeline !== undefined && timeline.tasks.length > 0 ? (
+              <GanttChart
+                timeline={timeline}
+                nameWidth={120}
+                maxHeight={360}
+                onCommit={handleCommit}
+              />
+            ) : (
+              <div style={{ display: 'grid', gap: '2px' }}>
+                <div style={{ color: c.ink }}>
+                  <strong>{state.definition.name}</strong>
+                  {timeline !== undefined && (
+                    <span style={{ color: c.muted }}>
+                      {' '}· {timeline.startDate} → {timeline.endDate} ({timeline.tasks.length} tasks)
+                    </span>
+                  )}
+                </div>
+                {timeline !== undefined && (
+                  <div>
+                    <span
+                      style={{
+                        color: timeline.feasible ? c.success : c.danger,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {timeline.feasible ? 'Feasible' : 'Not feasible'}
+                    </span>
+                    {timeline.conflicts.map((conflict, index) => (
+                      <div key={index} style={{ color: c.danger }}>• {conflict}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
