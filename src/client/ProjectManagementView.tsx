@@ -179,7 +179,7 @@ export function ProjectManagementView({ sessionId }: ProjectManagementViewProps)
       {loaded && error === undefined && state === undefined && (
         <p style={ROW}>
           No project in this workspace yet. Ask the agent to run the project interview, then
-          generate a timeline (pm.timeline.generate) and export it (pm.timeline.export).
+          generate a timeline (pm_timeline_generate) and export it (pm_timeline_export).
         </p>
       )}
 

@@ -59,7 +59,7 @@ function timelineReminder(context: unknown, registry: WorkspaceRegistryLike | un
       'Advise the user about these conflicts and offer options (reduce scope, add agents, or extend the deadline).',
     )
   }
-  lines.push(`Call pm.project.load to pull the full definition and timeline from ${projectStatePath(cwd)}.`)
+  lines.push(`Call pm_project_load to pull the full definition and timeline from ${projectStatePath(cwd)}.`)
   return lines.join('\n')
 }
 

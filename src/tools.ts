@@ -142,7 +142,7 @@ function renderTimeline(timeline: Timeline, statePath?: string): string {
   }
   if (statePath) lines.push(`Saved to: ${statePath}`)
   lines.push('')
-  lines.push('Canonical timeline JSON (pass this to pm.timeline.update / pm.timeline.export):')
+  lines.push('Canonical timeline JSON (pass this to pm_timeline_update / pm_timeline_export):')
   lines.push(JSON.stringify(timeline, null, 2))
   return lines.join('\n')
 }
@@ -196,9 +196,9 @@ function normalizeDefinition(raw: ProjectDefinition): { definition: ProjectDefin
 // Tools
 // ---------------------------------------------------------------------------
 
-/** pm.project.define — validate/normalize the interview result into a canonical definition. */
+/** pm_project_define — validate/normalize the interview result into a canonical definition. */
 export const defineProjectTool = defineTool({
-  name: 'pm.project.define',
+  name: 'pm_project_define',
   description:
     'Validate and normalize a project definition produced by the interview. Returns the canonical definition plus a list of issues (missing fields, bad dates, unknown dependencies). Call this once the interview has gathered features, timeline and budget.',
   parameters: {
@@ -237,9 +237,9 @@ export const defineProjectTool = defineTool({
   },
 })
 
-/** pm.timeline.generate — deterministic scheduling of a task breakdown against a definition. */
+/** pm_timeline_generate — deterministic scheduling of a task breakdown against a definition. */
 export const generateTimelineTool = defineTool({
-  name: 'pm.timeline.generate',
+  name: 'pm_timeline_generate',
   description:
     'Schedule tasks into a workday-aware timeline. The agent decomposes features into tasks; this tool computes dates from dependencies and effort, detects the critical path, and reports feasibility conflicts against the deadline and agent budget.',
   parameters: {
@@ -266,13 +266,13 @@ export const generateTimelineTool = defineTool({
   },
 })
 
-/** pm.timeline.update — apply patches to a timeline and re-schedule. */
+/** pm_timeline_update — apply patches to a timeline and re-schedule. */
 export const updateTimelineTool = defineTool({
-  name: 'pm.timeline.update',
+  name: 'pm_timeline_update',
   description:
     'Apply patches (renames, dependency changes, effort/agent changes, manual date pins) to a timeline and re-run the scheduler. Returns the updated timeline. Use it to review and adjust a generated timeline with the user.',
   parameters: {
-    timeline: { type: 'json', required: true, description: 'The current timeline JSON from pm.timeline.generate' },
+    timeline: { type: 'json', required: true, description: 'The current timeline JSON from pm_timeline_generate' },
     patches: { type: 'array', items: patchSchema, required: true, description: 'Task patches to apply' },
     definition: { type: 'json', description: 'Optional project definition, to keep deadline/budget feasibility checks' },
   },
@@ -348,9 +348,9 @@ export const updateTimelineTool = defineTool({
   },
 })
 
-/** pm.project.load — pull the saved project (definition + timeline) into the session. */
+/** pm_project_load — pull the saved project (definition + timeline) into the session. */
 export const loadProjectTool = defineTool({
-  name: 'pm.project.load',
+  name: 'pm_project_load',
   description:
     'Load the saved project (definition + timeline) from the workspace project-plan file (data/project_management/project_data.json). Use at the start of a session when the timeline reminder appears, or whenever the user wants to continue an existing plan.',
   parameters: {
@@ -375,7 +375,7 @@ export const loadProjectTool = defineTool({
         )
         for (const conflict of timeline.conflicts) lines.push(`Conflict: ${conflict}`)
       } else {
-        lines.push('No timeline yet — call pm.timeline.generate from this definition.')
+        lines.push('No timeline yet — call pm_timeline_generate from this definition.')
       }
       lines.push('')
       lines.push('Canonical state JSON:')
@@ -389,9 +389,9 @@ export const loadProjectTool = defineTool({
   },
 })
 
-/** pm.timeline.export — write the timeline as a Word or Excel file. */
+/** pm_timeline_export — write the timeline as a Word or Excel file. */
 export const exportTimelineTool = defineTool({
-  name: 'pm.timeline.export',
+  name: 'pm_timeline_export',
   description:
     'Export a timeline to a Word document (.docx: summary, task schedule, milestones, budget) or an Excel workbook (.xlsx: Summary, Tasks, and a colored Gantt sheet). Writes the file and returns its path.',
   parameters: {

@@ -58,8 +58,8 @@ hand.
 | `scripts/build-client.mjs` | esbuild bundle in the harness client-module format (`lib/client.js`) |
 
 The scheduler and exporters are **pure functions**; persistence happens in the
-tools (`pm.project.define` / `pm.timeline.generate` / `pm.timeline.update`),
-which write the workspace project file, and `pm.timeline.export`, which writes
+tools (`pm_project_define` / `pm_timeline_generate` / `pm_timeline_update`),
+which write the workspace project file, and `pm_timeline_export`, which writes
 the output file. Everything else has no side effects.
 
 ## Tool contracts
@@ -71,11 +71,11 @@ needs to continue.
 
 | Tool | Inputs | Behavior |
 |---|---|---|
-| `pm.project.define` | `definition` | Validates/normalizes the interview result into a canonical `ProjectDefinition`; persists it to the workspace; returns `{ definition, issues, statePath }` |
-| `pm.timeline.generate` | `definition`, `tasks[]`, `hoursPerDay?` | Schedules the task breakdown; persists definition + timeline; returns `{ timeline, statePath }` |
-| `pm.timeline.update` | `timeline`, `patches[]`, `definition?` | Applies patches (rename, deps, effort, agents, manual pins), re-schedules, persists; returns `{ timeline, skippedIds, statePath }` |
-| `pm.project.load` | `cwd?` | Loads the saved project state; returns `{ state, loaded }` — the resume entry point |
-| `pm.timeline.export` | `format`, `definition`, `timeline`, `path?` | Writes `.docx` or `.xlsx` and returns the absolute output path |
+| `pm_project_define` | `definition` | Validates/normalizes the interview result into a canonical `ProjectDefinition`; persists it to the workspace; returns `{ definition, issues, statePath }` |
+| `pm_timeline_generate` | `definition`, `tasks[]`, `hoursPerDay?` | Schedules the task breakdown; persists definition + timeline; returns `{ timeline, statePath }` |
+| `pm_timeline_update` | `timeline`, `patches[]`, `definition?` | Applies patches (rename, deps, effort, agents, manual pins), re-schedules, persists; returns `{ timeline, skippedIds, statePath }` |
+| `pm_project_load` | `cwd?` | Loads the saved project state; returns `{ state, loaded }` — the resume entry point |
+| `pm_timeline_export` | `format`, `definition`, `timeline`, `path?` | Writes `.docx` or `.xlsx` and returns the absolute output path |
 
 ## Data model
 
@@ -141,7 +141,7 @@ Both builders consume the same `definition` + `timeline`:
   sheet (same columns as Word), and a `Gantt` sheet — one column per workday,
   one row per task, with phase-colored bar cells and gold milestone markers.
 
-`pm.timeline.export` resolves relative paths against the harness process cwd
+`pm_timeline_export` resolves relative paths against the harness process cwd
 (`process.cwd()`) and writes the file with `node:fs/promises`.
 
 ## Interview flow (agent-owned)
@@ -149,9 +149,9 @@ Both builders consume the same `definition` + `timeline`:
 The `project-interview` skill gives the agent the protocol — one question at a
 time: features → priorities → timeline/milestones → **agent budget per
 duration** → constraints. When the definition is complete the agent calls
-`pm.project.define`, decomposes features into tasks, calls
-`pm.timeline.generate`, reviews feasibility with the user, adjusts via
-`pm.timeline.update`, then exports via `pm.timeline.export`.
+`pm_project_define`, decomposes features into tasks, calls
+`pm_timeline_generate`, reviews feasibility with the user, adjusts via
+`pm_timeline_update`, then exports via `pm_timeline_export`.
 
 ## Storage model
 
@@ -169,12 +169,12 @@ host app serves it verbatim at `/api/project-plan`). The document carries:
   header `cwd` → the durable workspace registry (`ctx.workspaceRegistry`, by
   session id) → `process.cwd()` for headless/direct calls. See
   `src/workspace.ts`.
-- `pm.project.define` writes the definition; `pm.timeline.generate` and
-  `pm.timeline.update` write the definition + timeline. Writes are atomic
+- `pm_project_define` writes the definition; `pm_timeline_generate` and
+  `pm_timeline_update` write the definition + timeline. Writes are atomic
   (write-to-temp then rename) and always produce the journey schema (see
   `src/project-plan.ts` for the mapping and sprint computation).
 - The file survives across sessions: a new session in the same workspace can
-  call `pm.project.load` to pull the definition and timeline back into the
+  call `pm_project_load` to pull the definition and timeline back into the
   conversation. Loading accepts plugin-written files (via `_dsh`) and
   foreign journey documents (reverse-mapped best-effort); a legacy
   `.dsh-pm/project.json` is read as a fallback.
@@ -194,7 +194,7 @@ if a **timeline exists** it injects a short user-role reminder:
 - each open conflict;
 - an instruction to advise the user about conflicts (reduce scope / add agents
   / extend the deadline);
-- a pointer to `pm.project.load` to continue the saved plan.
+- a pointer to `pm_project_load` to continue the saved plan.
 
 If no timeline exists (or no cwd is available) the provider returns empty text
 and nothing is injected. Because the harness materializes prompt contexts as

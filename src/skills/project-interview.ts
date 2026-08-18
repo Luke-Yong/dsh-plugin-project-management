@@ -54,7 +54,7 @@ changes dates or effort. Record in \`constraints\`.
   \`owners\` (who owns each task). Defaults: a single "Team" tier and owner.
 
 ## Finish
-When the definition is complete, call \`pm.project.define\` with the full definition:
+When the definition is complete, call \`pm_project_define\` with the full definition:
 
 \`\`\`json
 {
@@ -81,10 +81,10 @@ When the definition is complete, call \`pm.project.define\` with the full defini
 Then:
 1. Decompose features into \`tasks\` — each with \`id\`, \`name\`, \`phase\`, optional
    \`dependsOn\` (task ids), \`effortDays\`, and optional \`agents\` (parallelism).
-2. Call \`pm.timeline.generate\` with the definition and tasks.
+2. Call \`pm_timeline_generate\` with the definition and tasks.
 3. Review the returned timeline. If \`feasible\` is false or conflicts exist, discuss
    trade-offs with the user (reduce scope, add agents, extend deadline) and adjust.
-4. Apply adjustments with \`pm.timeline.update\`, then export with \`pm.timeline.export\`
+4. Apply adjustments with \`pm_timeline_update\`, then export with \`pm_timeline_export\`
    (\`format\`: \`docx\` or \`xlsx\`).`
 
 /** The project-interview skill contributed by this plugin. */

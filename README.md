@@ -8,18 +8,19 @@ The agent owns the loop: it runs a structured interview (via the
 `project-interview` skill), decomposes features into tasks, and uses five tools
 to validate, schedule, adjust, persist, and export. The scheduling math is
 deterministic. The project (definition + timeline) is persisted to a workspace
-project file (`.dsh-pm/project.json`) so it survives across sessions, and the
-plugin reminds the agent about an existing timeline on session resume.
+project file (`data/project_management/project_data.json`) so it survives across
+sessions, and the plugin reminds the agent about an existing timeline on
+session resume.
 
 ## Tools
 
 | Tool | Purpose |
 |---|---|
-| `pm.project.define` | Validate/normalize the interview result into a canonical `ProjectDefinition` (features, priorities, dates, milestones, agent budget per duration, constraints); persists it |
-| `pm.timeline.generate` | Deterministic scheduler: dependency-aware, workday-aware dating, critical path, deadline + budget feasibility checks; persists definition + timeline |
-| `pm.timeline.update` | Patch tasks (rename, dependencies, effort, agents, manual date pins), re-schedule, and persist |
-| `pm.project.load` | Load the saved project (definition + timeline) from `.dsh-pm/project.json` — use when resuming a session |
-| `pm.timeline.export` | Write `.docx` (summary, task schedule, milestones, budget) or `.xlsx` (Summary, Tasks, colored Gantt sheet) |
+| `pm_project_define` | Validate/normalize the interview result into a canonical `ProjectDefinition` (features, priorities, dates, milestones, agent budget per duration, constraints); persists it |
+| `pm_timeline_generate` | Deterministic scheduler: dependency-aware, workday-aware dating, critical path, deadline + budget feasibility checks; persists definition + timeline |
+| `pm_timeline_update` | Patch tasks (rename, dependencies, effort, agents, manual date pins), re-schedule, and persist |
+| `pm_project_load` | Load the saved project (definition + timeline) from `data/project_management/project_data.json` — use when resuming a session |
+| `pm_timeline_export` | Write `.docx` (summary, task schedule, milestones, budget) or `.xlsx` (Summary, Tasks, colored Gantt sheet) |
 
 ## Skill
 
@@ -81,10 +82,10 @@ both surfaces work with the stock web app.
 
 1. The agent interviews you (features, deadline, milestones, agent budget per
    duration).
-2. It calls `pm.project.define` to lock in and persist the definition.
-3. It decomposes features into tasks and calls `pm.timeline.generate`.
-4. It reviews feasibility with you and adjusts via `pm.timeline.update`.
-5. It exports with `pm.timeline.export` (`format: docx | xlsx`).
+2. It calls `pm_project_define` to lock in and persist the definition.
+3. It decomposes features into tasks and calls `pm_timeline_generate`.
+4. It reviews feasibility with you and adjusts via `pm_timeline_update`.
+5. It exports with `pm_timeline_export` (`format: docx | xlsx`).
 
 ## Persistence & session resume
 
@@ -95,7 +96,7 @@ both surfaces work with the stock web app.
    `data/project_management/project_data.json` consumed by `templates/gantt.html`.
 - On a new session in the same workspace, the plugin injects a reminder into
   the model context when a timeline exists, telling the agent about the saved
-  plan and its conflicts; the agent then calls `pm.project.load` to continue.
+  plan and its conflicts; the agent then calls `pm_project_load` to continue.
 - Writes are atomic (temp file + rename). A legacy `.dsh-pm/project.json` is
   read as a fallback for backward compatibility.
 

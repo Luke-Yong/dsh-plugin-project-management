@@ -103,7 +103,7 @@ export interface TimelineMilestone {
   date: string
 }
 
-/** Output of pm.timeline.generate / pm.timeline.update. */
+/** Output of pm_timeline_generate / pm_timeline_update. */
 export interface Timeline {
   projectName: string
   /** ISO date (YYYY-MM-DD). */
