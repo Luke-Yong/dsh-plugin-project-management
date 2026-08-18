@@ -17,7 +17,11 @@ export interface SlotsLike {
 
 export interface SlotRegisterInput {
   name: string
+  /** Stable entry id (view tabs and list entries are keyed by id). */
+  id?: string
   order?: number
+  /** Tab label thunk (evaluated per render, so it follows the locale). */
+  label?: () => string
   /** Business face: session slots receive the current session id. */
   inject?: (sessionId: string | undefined) => unknown
 }
@@ -43,6 +47,8 @@ export interface ProjectStateWire {
     conflicts: string[]
     criticalPath?: string[]
     tasks: unknown[]
+    phases?: { name: string; start: string; end: string }[]
+    milestones?: { name: string; date: string }[]
   }
   updatedAt: string
 }

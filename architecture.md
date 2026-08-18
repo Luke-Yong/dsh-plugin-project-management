@@ -28,7 +28,7 @@ hand.
 │  state.ts          → .dsh-pm/project.json persistence          │
 │  types.ts          → domain model (definition / timeline)      │
 │  date.ts           → workday-aware date math                   │
-│  client/           → browser half (rail button + composer pane)│
+│  client/           → browser half (Project tab + management view)│
 └────────────────────────────────────────────────────────────────┘
 ```
 
@@ -194,17 +194,19 @@ The plugin ships a **client module** that mounts into the harness web GUI
 through the slot system (declared `dsh.client` in `package.json`, bundle at
 `exports["./client"]`):
 
-- **Rail button** → `sidebar.workspaces.header.actions` (root-scoped list
-  slot). The slot is declared by the ui-workspace harness patch (see
-  `patches/ui-workspace.sidebar-header-actions.md` — the section header is
-  internal to `WorkspaceBrowser`, so it has no public slot yet).
-- **Project management pane** → `conversation.input.dock` (order 10, between
-  the todo strip at 0 and the queue at 20), rendered inside the composer
-  stack. The button and the pane share a tiny module store, so the button
-  toggles the pane.
-- **Data** → the pane fetches `GET /plugins/project-management/state?session=…`
+- **Project tab** → registered into `conversation.view` (the conversation
+  header's view-tab slot, id `project-management`, order 20 — the same slot
+  ui-trajectory's tab uses). Selecting it renders the project management view.
+- **View body** → `ProjectManagementView` (full-height pane: name, timeline
+  span, feasibility, phases, critical path, milestones, conflicts, budget).
+- **Data** → the view fetches `GET /plugins/project-management/state?session=…`
   (registered by `src/web.ts` on `ctx.webServer`); the server resolves the
   session cwd via `ctx.sessions` and reads `.dsh-pm/project.json`.
+
+Because the tab uses an existing, declared slot, **no harness patch is
+required** — it works with the stock web app. (A sidebar rail button was
+attempted first, but the section header is internal to ui-workspace with no
+public slot, so the tab is the clean path.)
 
 The bundle is built by `scripts/build-client.mjs` (esbuild) into the harness
 client-module format: a closure factory registered through
@@ -213,6 +215,14 @@ client-module format: a closure factory registered through
 module table. The client code is structurally typed — the ui-conversation
 client packages are not npm-publishable yet, so their real types can't be
 installed standalone.
+
+Packaging: `package.json` declares `dsh.client` (with the slot-declaring
+packages as `inject` edges), exports `./client` and `./package.json`, and a
+`prepare` script builds both halves on install — so GitHub installs work
+without committing `dist/`/`lib/`. The `@deepseek-ai/dsh-tools` peer allows
+both the `0.0.x` and `0.1.x` rc lines (`^0.0.1-rc.1 || ^0.1.0-rc.1`); the
+plugin loads against the current harness line, but watch for tool-API drift on
+the `pm.*` calls when the harness bumps majors.
 
 Two further UI surfaces remain available for a richer Gantt later:
 
@@ -224,9 +234,7 @@ Two further UI surfaces remain available for a richer Gantt later:
 
 ## Known limitations / roadmap
 
-- The rail button requires the ui-workspace harness patch (patches/); the pane
-  and data route work with the stock harness.
+- The pane is a read-only summary view (no drag-to-reschedule yet).
 - A single project per workspace (one `.dsh-pm/project.json`).
 - Weekend-only workweek; no holidays or configurable calendar.
-- The pane is a read-only summary dock (no drag-to-reschedule yet).
 - Multi-project and live agent-budget tracking are out of scope for the MVP.

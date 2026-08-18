@@ -37,6 +37,11 @@ npm install
 npm run build       # tsc server → dist/, esbuild client → lib/client.js
 ```
 
+The `prepare` script builds both halves automatically, so GitHub installs
+(`npm install github:<user>/dsh-plugin-project-management`) work without
+committing `dist/`/`lib/` (they are gitignored). `./package.json` is exported
+for tooling that needs the `dsh.client` manifest.
+
 From a DeepSeek Harness checkout:
 
 ```sh
@@ -53,19 +58,19 @@ Open `http://127.0.0.1:3080` and ask, for example:
 
 ## Web UI
 
-The plugin ships a browser half that mounts into the web GUI:
+The plugin ships a browser half that adds a **Project** tab to the
+conversation header's view tabs (the `conversation.view` slot — the same
+mechanism ui-trajectory uses). Selecting it shows the project management pane:
 
-- A **Project** button in the sidebar section header, and
-- a **project management pane** inside the composer stack (below the input).
+- project name, description, and last-updated time;
+- timeline span, task count, and feasibility;
+- phases, critical path, milestones, and open conflicts;
+- the agent budget model.
 
 The pane reads the saved project state for the current session from
-`/plugins/project-management/state` and shows name, span, feasibility, critical
-path, and conflicts; the rail button toggles it.
-
-The rail button needs one small harness patch (the section header is internal
-to `ui-workspace`): see [patches/ui-workspace.sidebar-header-actions.md](patches/ui-workspace.sidebar-header-actions.md).
-Without the patch, the pane still works (it renders when toggled from any
-surface that calls it); the stock harness just has no button wired to it yet.
+`/plugins/project-management/state` (server resolves the session cwd and reads
+`.dsh-pm/project.json`). No harness patch is required — the tab works with the
+stock web app.
 
 ## Flow
 

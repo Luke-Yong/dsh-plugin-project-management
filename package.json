@@ -13,15 +13,15 @@
     },
     "./client": {
       "default": "./lib/client.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "dsh": {
     "client": {
       "platform": "web",
       "inject": [
         "@deepseek-ai/dsh-client-ui-slots",
-        "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-workspace"
+        "@deepseek-ai/dsh-client-ui-conversation"
       ]
     }
   },
@@ -30,6 +30,7 @@
     "lib"
   ],
   "scripts": {
+    "prepare": "npm run build",
     "build": "tsc -p tsconfig.json && node scripts/build-client.mjs",
     "build:server": "tsc -p tsconfig.json",
     "build:client": "node scripts/build-client.mjs",
@@ -42,7 +43,7 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-tools": "0.0.1-rc.1",
+    "@deepseek-ai/dsh-tools": "^0.0.1-rc.1 || ^0.1.0-rc.1",
     "react": "^18.0.0"
   },
   "devDependencies": {
@@ -54,7 +55,7 @@
     "@deepseek-ai/dsh-scope": "^0.0.1-rc.1",
     "@deepseek-ai/dsh-session": "^0.0.1-rc.1",
     "@deepseek-ai/dsh-system-prompt": "^0.0.1-rc.1",
-    "@deepseek-ai/dsh-tools": "0.0.1-rc.1",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.1",
     "@deepseek-ai/dsh-user-approval": "^0.0.1-rc.1",
     "@types/node": "^22.10.0",
     "@types/react": "^18.3.31",
