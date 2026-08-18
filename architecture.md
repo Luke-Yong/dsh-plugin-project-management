@@ -50,6 +50,7 @@ hand.
 | `src/scheduler.ts` | Pure scheduling: dependencies, workdays, pins, critical path, feasibility |
 | `src/export.ts` | Pure builders: Word (`docx`) and Excel (`exceljs`) |
 | `src/state.ts` | Workspace persistence: `data/project_management/project_data.json` read/write |
+| `src/workspace.ts` | Workspace resolution: session header cwd → workspace registry → process cwd |
 | `src/types.ts` | `ProjectDefinition`, `Timeline`, `BudgetModel`, `Feature`, … |
 | `src/date.ts` | ISO date math that skips weekends |
 | `src/skills/project-interview.ts` | The `project-interview` skill body (markdown) |
@@ -164,9 +165,10 @@ host app serves it verbatim at `/api/project-plan`). The document carries:
 - a `_dsh` block with the plugin's own round-trip state (definition +
   timeline + `updatedAt`); the gantt renderer ignores it.
 
-- The workspace directory is resolved from the executing agent's session
-  (`agent.session.header.cwd`, set when the session was created), falling back
-  to `process.cwd()` for headless/direct calls.
+- The workspace directory is resolved in order: the executing session's
+  header `cwd` → the durable workspace registry (`ctx.workspaceRegistry`, by
+  session id) → `process.cwd()` for headless/direct calls. See
+  `src/workspace.ts`.
 - `pm.project.define` writes the definition; `pm.timeline.generate` and
   `pm.timeline.update` write the definition + timeline. Writes are atomic
   (write-to-temp then rename) and always produce the journey schema (see
@@ -208,6 +210,11 @@ through the slot system (declared `dsh.client` in `package.json`, bundle at
 - **Project tab** → registered into `conversation.view` (the conversation
   header's view-tab slot, id `project-management`, order 20 — the same slot
   ui-trajectory's tab uses). Selecting it renders the project management view.
+  The view-tab ring only renders once a session is active (≥ 1 turn), so the
+  plugin also registers a **composer dock**.
+- **Composer dock** → `conversation.input.dock` (order 10): a compact project
+  dock that renders even for blank/0-turn sessions and auto-appears when a
+  saved project exists.
 - **View body** → `ProjectManagementView` (full-height pane: name, timeline
   span, feasibility, phases, critical path, milestones, conflicts, budget).
 - **Data** → the view fetches `GET /plugins/project-management/state?session=…`

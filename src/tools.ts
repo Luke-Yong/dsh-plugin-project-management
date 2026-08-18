@@ -6,6 +6,7 @@ import { buildDocx, buildXlsx, slugify } from './export.js'
 import { schedule, type TaskInput } from './scheduler.js'
 import { loadProject, saveProject, type ProjectState } from './state.js'
 import type { ProjectDefinition, Timeline } from './types.js'
+import { resolveCwdFromExecution, type WorkspaceRegistryLike } from './workspace.js'
 
 // ---------------------------------------------------------------------------
 // Schema DSL constants (required: true keeps literal typing for arg inference)
@@ -146,9 +147,16 @@ function renderTimeline(timeline: Timeline, statePath?: string): string {
   return lines.join('\n')
 }
 
-/** Resolve the workspace directory from the executing agent's session, else the process cwd. */
+let workspaceRegistry: WorkspaceRegistryLike | undefined
+
+/** Set the durable workspace registry (called by the plugin entry). */
+export function setWorkspaceRegistry(registry: WorkspaceRegistryLike | undefined): void {
+  workspaceRegistry = registry
+}
+
+/** Resolve the workspace directory: session header cwd → workspace registry → process cwd. */
 function resolveCwd(exec: ToolRunContext): string {
-  return exec.agent?.session?.header?.cwd ?? process.cwd()
+  return resolveCwdFromExecution(exec, workspaceRegistry) ?? process.cwd()
 }
 
 function normalizeDefinition(raw: ProjectDefinition): { definition: ProjectDefinition; issues: string[] } {

@@ -58,19 +58,24 @@ Open `http://127.0.0.1:3080` and ask, for example:
 
 ## Web UI
 
-The plugin ships a browser half that adds a **Project** tab to the
-conversation header's view tabs (the `conversation.view` slot — the same
-mechanism ui-trajectory uses). Selecting it shows the project management pane:
+The plugin ships a browser half with two surfaces:
 
-- project name, description, and last-updated time;
-- timeline span, task count, and feasibility;
-- phases, critical path, milestones, and open conflicts;
-- the agent budget model.
+- A **Project** tab in the conversation header's view tabs (the
+  `conversation.view` slot — the same mechanism ui-trajectory uses). Note:
+  the view-tab ring only appears once the session is active (≥ 1 turn).
+- A **compact project dock** inside the composer stack (`conversation.input.dock`)
+  that renders even for blank sessions and auto-appears when a project exists,
+  so project management is reachable before the tabs show.
+
+Selecting the tab (or reading the dock) shows: project name, description, and
+last-updated time; timeline span, task count, and feasibility; phases, critical
+path, milestones, and open conflicts; the agent budget model.
 
 The pane reads the saved project state for the current session from
-`/plugins/project-management/state` (server resolves the session cwd and reads
-`.dsh-pm/project.json`). No harness patch is required — the tab works with the
-stock web app.
+`/plugins/project-management/state` (server resolves the session cwd — session
+header → workspace registry → process cwd — and reads
+`data/project_management/project_data.json`). No harness patch is required —
+both surfaces work with the stock web app.
 
 ## Flow
 

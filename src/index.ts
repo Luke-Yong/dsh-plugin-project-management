@@ -1,7 +1,9 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { PROJECT_INTERVIEW_SKILL, type SkillRegistrationLike } from './skills/project-interview.js'
 import { loadProjectSync, projectStatePath } from './state.js'
+import { setWorkspaceRegistry } from './tools.js'
 import { registerProjectStateRoute, type SessionStoreLike, type WebServerLike } from './web.js'
+import { resolveCwdForSession, type WorkspaceRegistryLike } from './workspace.js'
 import {
   defineProjectTool,
   exportTimelineTool,
@@ -28,16 +30,19 @@ interface SystemPromptLike {
 }
 
 /** The agent field is added to the assembly context by dsh-agent. */
-function sessionCwd(context: unknown): string | undefined {
-  return (context as { agent?: { session?: { header?: { cwd?: string } } } }).agent?.session?.header?.cwd
+function sessionCwd(context: unknown, registry: WorkspaceRegistryLike | undefined): string | undefined {
+  const agent = (context as { agent?: { id?: string; session?: { header?: { cwd?: string } } } }).agent
+  const headerCwd = agent?.session?.header?.cwd
+  if (headerCwd !== undefined && headerCwd !== '') return headerCwd
+  return resolveCwdForSession(registry, agent?.id)
 }
 
 /**
  * Reminder injected as dynamic model context: if the workspace has a saved
  * timeline, tell the agent about it and what to advise the user.
  */
-function timelineReminder(context: unknown): string {
-  const cwd = sessionCwd(context)
+function timelineReminder(context: unknown, registry: WorkspaceRegistryLike | undefined): string {
+  const cwd = sessionCwd(context, registry)
   if (!cwd) return ''
   const state = loadProjectSync(cwd)
   const timeline = state?.timeline
@@ -69,6 +74,11 @@ export function apply(ctx: Context) {
     ctx.tools.register(tool)
   }
 
+  // Workspace resolution: tools fall back to the durable workspace registry
+  // when a session header has no cwd.
+  const workspaceRegistry = ctx.get('workspaceRegistry') as WorkspaceRegistryLike | undefined
+  setWorkspaceRegistry(workspaceRegistry)
+
   // Optional dependency: register the interview skill when the skill service
   // is mounted (standard profile includes it).
   const skills = ctx.get('skills') as SkillRegistryLike | undefined
@@ -82,7 +92,7 @@ export function apply(ctx: Context) {
     systemPrompt.context({
       name: 'project-management-timeline',
       order: 1000,
-      text: (context) => timelineReminder(context),
+      text: (context) => timelineReminder(context, workspaceRegistry),
     })
   }
 
@@ -91,6 +101,7 @@ export function apply(ctx: Context) {
   if (webServer) {
     registerProjectStateRoute(webServer, {
       sessions: ctx.get('sessions') as SessionStoreLike | undefined,
+      workspaceRegistry,
     })
   }
 }

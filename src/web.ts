@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { loadProject } from './state.js'
+import { resolveCwdForSession, type WorkspaceRegistryLike } from './workspace.js'
 
 /** Structural view of `ctx.webServer` (optional service). */
 export interface WebServerLike {
@@ -17,6 +18,8 @@ export interface SessionStoreLike {
 
 export interface ProjectStateRouteOptions {
   sessions?: SessionStoreLike
+  /** Durable workspace registry (`ctx.workspaceRegistry`), for sessions without a header cwd. */
+  workspaceRegistry?: WorkspaceRegistryLike
 }
 
 /** Absolute pathname of the project-state read route. */
@@ -39,18 +42,24 @@ export function registerProjectStateRoute(
       const url = new URL(req.url ?? '/', 'http://localhost')
       const sessionId = url.searchParams.get('session')
       const pathParam = url.searchParams.get('path')
-      const sessionCwd = sessionId !== null && options.sessions !== undefined
-        ? options.sessions.get(sessionId)?.header?.cwd
-        : undefined
-      if (sessionId !== null && options.sessions !== undefined && sessionCwd === undefined) {
-        res.writeHead(404, { 'content-type': 'application/json' })
-        res.end(JSON.stringify({ error: 'unknown session', sessionId }))
-        return
+
+      // Workspace resolution order: session header cwd → workspace registry → path param.
+      let cwd: string | undefined
+      if (sessionId !== null && options.sessions !== undefined) {
+        const headerCwd = options.sessions.get(sessionId)?.header?.cwd
+        if (headerCwd !== undefined && headerCwd !== '') cwd = headerCwd
       }
-      const cwd = sessionCwd ?? pathParam
-      if (typeof cwd !== 'string' || cwd === '') {
-        res.writeHead(400, { 'content-type': 'application/json' })
-        res.end(JSON.stringify({ error: 'provide a session id or a path' }))
+      if (cwd === undefined && sessionId !== null) {
+        cwd = resolveCwdForSession(options.workspaceRegistry, sessionId)
+      }
+      if (cwd === undefined && pathParam !== null) cwd = pathParam
+
+      if (cwd === undefined) {
+        res.writeHead(sessionId !== null ? 404 : 400, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({
+          error: sessionId !== null ? 'unknown session' : 'provide a session id or a path',
+          sessionId: sessionId ?? undefined,
+        }))
         return
       }
       const state = await loadProject(cwd)
