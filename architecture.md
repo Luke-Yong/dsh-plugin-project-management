@@ -20,6 +20,7 @@ hand.
 ┌──────▼────────────▼───────────────────────────┴───────────────┐
 │ dsh-plugin-project-management                                  │
 │  index.ts          → plugin entry (name / inject / apply)      │
+│  web.ts            → project-state HTTP route (web pane)       │
 │  skills/project-interview.ts → interview protocol (skill)      │
 │  tools.ts          → 5 defineTool registrations                │
 │  scheduler.ts      → deterministic scheduling engine           │
@@ -27,6 +28,7 @@ hand.
 │  state.ts          → .dsh-pm/project.json persistence          │
 │  types.ts          → domain model (definition / timeline)      │
 │  date.ts           → workday-aware date math                   │
+│  client/           → browser half (rail button + composer pane)│
 └────────────────────────────────────────────────────────────────┘
 ```
 
@@ -42,7 +44,8 @@ hand.
 
 | File | Responsibility |
 |---|---|
-| `src/index.ts` | Registers the five tools, the interview skill, and the session-resume reminder |
+| `src/index.ts` | Registers the five tools, the interview skill, the session-resume reminder, and the web route |
+| `src/web.ts` | `GET /plugins/project-management/state` — serves the saved project state to the web pane |
 | `src/tools.ts` | `defineTool` declarations: schemas, output renderers, `execute` bodies |
 | `src/scheduler.ts` | Pure scheduling: dependencies, workdays, pins, critical path, feasibility |
 | `src/export.ts` | Pure builders: Word (`docx`) and Excel (`exceljs`) |
@@ -50,6 +53,8 @@ hand.
 | `src/types.ts` | `ProjectDefinition`, `Timeline`, `BudgetModel`, `Feature`, … |
 | `src/date.ts` | ISO date math that skips weekends |
 | `src/skills/project-interview.ts` | The `project-interview` skill body (markdown) |
+| `src/client/*` | Browser half: rail button, composer pane, slot registration, bundle build |
+| `scripts/build-client.mjs` | esbuild bundle in the harness client-module format (`lib/client.js`) |
 
 The scheduler and exporters are **pure functions**; persistence happens in the
 tools (`pm.project.define` / `pm.timeline.generate` / `pm.timeline.update`),
@@ -183,34 +188,45 @@ and nothing is injected. Because the harness materializes prompt contexts as
 durable snapshots only when they change, the reminder is not re-injected on
 every turn.
 
-## UI integration points (where a Gantt UI would render)
+## Web UI (browser half)
 
-Two distinct places, depending on how the Gantt is built:
+The plugin ships a **client module** that mounts into the harness web GUI
+through the slot system (declared `dsh.client` in `package.json`, bundle at
+`exports["./client"]`):
 
-1. **Tool-result presenters (inline cards).** `defineTool` supports
-   `presentCall` / `presentResult` / `presentationMeta`, which render
-   `ToolCallView` / `ToolResultView` cards wherever a tool call's result is
-   shown in the agent console / trajectory. A lightweight Gantt (e.g. an SVG
-   preview) would appear **inline in the conversation**, immediately under the
-   `pm.timeline.generate` / `update` / `export` calls that produced it.
-   Presenters must be pure, side-effect-free, and replayable — so the Gantt
-   must be derived from the canonical value, not from live state.
+- **Rail button** → `sidebar.workspaces.header.actions` (root-scoped list
+  slot). The slot is declared by the ui-workspace harness patch (see
+  `patches/ui-workspace.sidebar-header-actions.md` — the section header is
+  internal to `WorkspaceBrowser`, so it has no public slot yet).
+- **Project management pane** → `conversation.input.dock` (order 10, between
+  the todo strip at 0 and the queue at 20), rendered inside the composer
+  stack. The button and the pane share a tiny module store, so the button
+  toggles the pane.
+- **Data** → the pane fetches `GET /plugins/project-management/state?session=…`
+  (registered by `src/web.ts` on `ctx.webServer`); the server resolves the
+  session cwd via `ctx.sessions` and reads `.dsh-pm/project.json`.
 
-2. **Web client module (app-level view).** A package can declare
-   `dsh.client: { platform: 'web' }` in `package.json` and export a bundle at
-   `exports["./client"]`; the harness serves it at `/plugins/<id>/client.js`
-   and mounts it into the web app via the `window.__DSH_BOOT__` boot graph
-   (`ctx.clientModules`). This is where a **dedicated, interactive Gantt
-   panel/route in the web UI** would live (e.g. drag-to-reschedule), and where
-   it can share data with the tools through a plugin service.
+The bundle is built by `scripts/build-client.mjs` (esbuild) into the harness
+client-module format: a closure factory registered through
+`window.__ModuleLoader__.load({ id, factory })`, with platform modules
+(`react`, `@deepseek-ai/dsh-client-ui-slots`, …) left external to the loader's
+module table. The client code is structurally typed — the ui-conversation
+client packages are not npm-publishable yet, so their real types can't be
+installed standalone.
 
-Recommended path: ship the inline presenter first (zero app changes, appears in
-every session automatically), then add the client module for an interactive
-editor when the data model stabilizes.
+Two further UI surfaces remain available for a richer Gantt later:
+
+- **Tool-result presenters** (`presentCall` / `presentResult`) render inline
+  cards in the agent console/trajectory; presenters must be pure and derived
+  from the canonical value.
+- **`conversation.view`** adds a full conversation view tab (e.g. a
+  drag-to-reschedule Gantt).
 
 ## Known limitations / roadmap
 
+- The rail button requires the ui-workspace harness patch (patches/); the pane
+  and data route work with the stock harness.
 - A single project per workspace (one `.dsh-pm/project.json`).
 - Weekend-only workweek; no holidays or configurable calendar.
-- No custom Gantt UI yet (see integration points above).
+- The pane is a read-only summary dock (no drag-to-reschedule yet).
 - Multi-project and live agent-budget tracking are out of scope for the MVP.

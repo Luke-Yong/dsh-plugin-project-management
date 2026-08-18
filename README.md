@@ -29,11 +29,12 @@ plugin reminds the agent about an existing timeline on session resume.
 
 ## Install
 
-Build the plugin, then load it with a Cordis overlay patch:
+Build the plugin (server + browser bundle), then load it with a Cordis overlay
+patch:
 
 ```sh
 npm install
-npm run build
+npm run build       # tsc server → dist/, esbuild client → lib/client.js
 ```
 
 From a DeepSeek Harness checkout:
@@ -42,9 +43,29 @@ From a DeepSeek Harness checkout:
 pnpm dsh web --patch /absolute/path/to/dsh-plugin-project-management/cordis.yml
 ```
 
+The plugin package must be resolvable from the config tree's baseUrl — install
+or `pnpm link` it into the harness checkout (it is a dependency of the cordis.yml
+package, per the client-modules resolution rule).
+
 Open `http://127.0.0.1:3080` and ask, for example:
 
 > Plan a timeline for my mobile app and export it as both Word and Excel.
+
+## Web UI
+
+The plugin ships a browser half that mounts into the web GUI:
+
+- A **Project** button in the sidebar section header, and
+- a **project management pane** inside the composer stack (below the input).
+
+The pane reads the saved project state for the current session from
+`/plugins/project-management/state` and shows name, span, feasibility, critical
+path, and conflicts; the rail button toggles it.
+
+The rail button needs one small harness patch (the section header is internal
+to `ui-workspace`): see [patches/ui-workspace.sidebar-header-actions.md](patches/ui-workspace.sidebar-header-actions.md).
+Without the patch, the pane still works (it renders when toggled from any
+surface that calls it); the stock harness just has no button wired to it yet.
 
 ## Flow
 

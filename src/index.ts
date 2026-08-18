@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { PROJECT_INTERVIEW_SKILL, type SkillRegistrationLike } from './skills/project-interview.js'
 import { loadProjectSync, projectStatePath } from './state.js'
+import { registerProjectStateRoute, type SessionStoreLike, type WebServerLike } from './web.js'
 import {
   defineProjectTool,
   exportTimelineTool,
@@ -82,6 +83,14 @@ export function apply(ctx: Context) {
       name: 'project-management-timeline',
       order: 1000,
       text: (context) => timelineReminder(context),
+    })
+  }
+
+  // Optional dependency: serve the saved project state to the web pane.
+  const webServer = ctx.get('webServer') as WebServerLike | undefined
+  if (webServer) {
+    registerProjectStateRoute(webServer, {
+      sessions: ctx.get('sessions') as SessionStoreLike | undefined,
     })
   }
 }
