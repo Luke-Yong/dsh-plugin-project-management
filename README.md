@@ -120,8 +120,6 @@ both surfaces work with the stock web app.
 ## Notes / MVP limitations
 
 - A single project per workspace.
-- Weekends (Sat/Sun) are skipped; a future version can expose a configurable
-  workweek and holidays.
 
 ## Roadmap
 
