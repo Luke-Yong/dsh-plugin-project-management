@@ -59,6 +59,8 @@ Open `http://127.0.0.1:3080` and ask, for example:
 
 ## Web UI
 
+![Project management Web UI](Screenshot.png)
+
 The plugin ships a browser half with two surfaces:
 
 - A **Project** tab in the conversation header's view tabs (the
