@@ -38,10 +38,25 @@ npm install
 npm run build       # tsc server → dist/, esbuild client → lib/client.js
 ```
 
-The `prepare` script builds both halves automatically, so GitHub installs
-(`npm install github:<user>/dsh-plugin-project-management`) work without
-committing `dist/`/`lib/` (they are gitignored). `./package.json` is exported
-for tooling that needs the `dsh.client` manifest.
+### From GitHub
+
+The `prepare` script builds both halves automatically, so GitHub installs work
+without committing `dist/`/`lib/` (they are gitignored). Install the plugin
+into the `web` profile directly from GitHub:
+
+```sh
+dsh plugin --profile web add github:Luke-Yong/dsh-plugin-project-management
+```
+
+This forwards `pnpm add github:Luke-Yong/dsh-plugin-project-management` inside
+the profile directory. Equivalent to installing the package into a DeepSeek
+Harness checkout manually:
+
+```sh
+npm install github:Luke-Yong/dsh-plugin-project-management
+```
+
+`./package.json` is exported for tooling that needs the `dsh.client` manifest.
 
 From a DeepSeek Harness checkout:
 
