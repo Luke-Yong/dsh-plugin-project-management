@@ -43,9 +43,12 @@ Ask how the user wants to express agent budget per duration. Offer examples:
 Record BOTH the unit and the period (per week / per month / per phase) in
 \`budgetModel.allocations\` ({ "period": "week", "amount": 40 }).
 
-### 4. Constraints & risks
-Teams, approvals, holidays, dependencies on other projects — anything that
-changes dates or effort. Record in \`constraints\`.
+### 4. Constraints, risks & calendar
+Teams, approvals, dependencies on other projects — anything that changes dates
+or effort. Record in \`constraints\`. Also capture the \`calendar.country\`
+(ISO country code, e.g. \`SG\`) so scheduling excludes that country's public
+holidays (lunar holidays like Chinese New Year are resolved by rule), plus any
+extra fixed days off in \`calendar.holidays\` (YYYY-MM-DD).
 
 ### 5. Reporting & teams (optional)
 - \`reportingCadence\` (e.g. "bi-weekly") and \`sprintDays\` (e.g. 14) for the
@@ -71,6 +74,7 @@ When the definition is complete, call \`pm_project_define\` with the full defini
     { "id": "auth", "title": "User login", "priority": "must", "phase": "foundation", "effortDays": 3 }
   ],
   "constraints": ["Single reviewer for UI changes"],
+  "calendar": { "country": "SG" },
   "tiers": [{ "id": "team", "name": "Team" }],
   "owners": ["Team"],
   "reportingCadence": "bi-weekly",

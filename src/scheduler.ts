@@ -1,3 +1,4 @@
+import type { HolidaySet } from './date.js'
 import {
   addWorkdays,
   diffDays,
@@ -40,7 +41,12 @@ interface Resolved {
  * dating, critical-path detection, and deadline/budget feasibility checks.
  * The agent decomposes features into tasks; this function only does the math.
  */
-export function schedule(definition: ProjectDefinition, tasks: TaskInput[], hoursPerDay = 8): Timeline {
+export function schedule(
+  definition: ProjectDefinition,
+  tasks: TaskInput[],
+  hoursPerDay = 8,
+  holidays?: HolidaySet,
+): Timeline {
   const conflicts: string[] = []
   const byId = new Map<string, TaskInput>(tasks.map((t) => [t.id, t]))
   const knownIds = new Set(tasks.map((t) => t.id))
@@ -81,13 +87,13 @@ export function schedule(definition: ProjectDefinition, tasks: TaskInput[], hour
         start = parseDate(t.pinnedStart)
       } else if (deps.length > 0) {
         const latest = new Date(Math.max(...deps.map((d) => resolved.get(d)!.end.getTime())))
-        start = nextWorkday(latest)
+        start = nextWorkday(latest, holidays)
       } else {
-        start = isWorkday(projectStart) ? new Date(projectStart) : nextWorkday(projectStart)
+        start = isWorkday(projectStart, holidays) ? new Date(projectStart) : nextWorkday(projectStart, holidays)
       }
       const end = t.pinnedEnd
         ? parseDate(t.pinnedEnd)
-        : addWorkdays(start, Math.max(0, Math.ceil(t.effortDays / Math.max(1, t.agents ?? 1)) - 1))
+        : addWorkdays(start, Math.max(0, Math.ceil(t.effortDays / Math.max(1, t.agents ?? 1)) - 1), holidays)
       resolved.set(t.id, { start, end })
       resolutionOrder.push(t.id)
       progress = true
@@ -124,10 +130,10 @@ export function schedule(definition: ProjectDefinition, tasks: TaskInput[], hour
     } else {
       const latestStarts = followers.map((f) => {
         const end = latestEnd.get(f)!
-        const duration = workdayCountInclusive(resolved.get(f)!.start, end)
-        return subtractWorkdays(end, duration - 1)
+        const duration = workdayCountInclusive(resolved.get(f)!.start, end, holidays)
+        return subtractWorkdays(end, duration - 1, holidays)
       })
-      latest = previousWorkday(new Date(Math.min(...latestStarts.map((d) => d.getTime()))))
+      latest = previousWorkday(new Date(Math.min(...latestStarts.map((d) => d.getTime()))), holidays)
     }
     latestEnd.set(id, latest)
   }

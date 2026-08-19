@@ -1,6 +1,7 @@
 import { Document, HeadingLevel, Packer, Paragraph, ShadingType, Table, TableCell, TableRow, TextRun, WidthType } from 'docx'
 import ExcelJS from 'exceljs'
 import { listWorkdays, parseDate, toIso } from './date.js'
+import { buildHolidaySet } from './holidays.js'
 import type { ProjectDefinition, Timeline } from './types.js'
 
 /** Lowercase, dash-separated file stem from a project name. */
@@ -198,7 +199,13 @@ export async function buildXlsx(definition: ProjectDefinition, timeline: Timelin
 
   // --- Gantt ---------------------------------------------------------------
   const gantt = workbook.addWorksheet('Gantt')
-  const dateColumns = listWorkdays(parseDate(timeline.startDate), parseDate(timeline.endDate))
+  const holidays = buildHolidaySet(
+    definition.calendar?.country,
+    timeline.startDate,
+    timeline.endDate,
+    definition.calendar?.holidays,
+  )
+  const dateColumns = listWorkdays(parseDate(timeline.startDate), parseDate(timeline.endDate), holidays)
   gantt.getCell('A1').value = 'Task'
   gantt.getCell('A1').font = { bold: true }
   dateColumns.forEach((iso, i) => {

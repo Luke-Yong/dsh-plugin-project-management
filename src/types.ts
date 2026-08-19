@@ -42,6 +42,18 @@ export interface Milestone {
   note?: string
 }
 
+/**
+ * Workday calendar options. `country` enables public-holiday lookup via the
+ * rules-based `date-holidays` package; `holidays` adds project-specific days
+ * off on top of it.
+ */
+export interface ProjectCalendar {
+  /** ISO 3166-1 alpha-2 country code, e.g. "SG". */
+  country?: string
+  /** Extra holiday dates (YYYY-MM-DD) merged into the country calendar. */
+  holidays?: string[]
+}
+
 /** Canonical project definition produced by the interview. */
 export interface ProjectDefinition {
   name: string
@@ -63,6 +75,8 @@ export interface ProjectDefinition {
   reportingCadence?: string
   /** Sprint length in days (default 14). */
   sprintDays?: number
+  /** Workday calendar: country for public holidays + extra days off. */
+  calendar?: ProjectCalendar
 }
 
 /** A scheduled work package inside a timeline. */

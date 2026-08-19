@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { buildHolidaySet } from './holidays.js'
 import { loadProject, saveProject, type ProjectState } from './state.js'
 import { schedule, type TaskInput } from './scheduler.js'
 import { resolveCwdForSession, type WorkspaceRegistryLike } from './workspace.js'
@@ -231,7 +232,13 @@ export function registerProjectTimelineUpdateRoute(
         }
       }
 
-      const timeline = schedule(state.definition, [...byId.values()])
+      const holidays = buildHolidaySet(
+        state.definition.calendar?.country,
+        state.timeline.startDate,
+        state.timeline.endDate,
+        state.definition.calendar?.holidays,
+      )
+      const timeline = schedule(state.definition, [...byId.values()], 8, holidays)
       const updated: ProjectState = {
         ...state,
         timeline,

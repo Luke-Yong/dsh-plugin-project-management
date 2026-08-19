@@ -17,7 +17,7 @@ session resume.
 | Tool | Purpose |
 |---|---|
 | `pm_project_define` | Validate/normalize the interview result into a canonical `ProjectDefinition` (features, priorities, dates, milestones, agent budget per duration, constraints); persists it |
-| `pm_timeline_generate` | Deterministic scheduler: dependency-aware, workday-aware dating, critical path, deadline + budget feasibility checks; persists definition + timeline |
+| `pm_timeline_generate` | Deterministic scheduler: dependency-aware, workday-aware dating (weekends + the country's public holidays via `calendar.country`), critical path, deadline + budget feasibility checks; persists definition + timeline |
 | `pm_timeline_update` | Patch tasks (rename, dependencies, effort, agents, manual date pins), re-schedule, and persist |
 | `pm_project_load` | Load the saved project (definition + timeline) from `data/project_management/project_data.json` — use when resuming a session |
 | `pm_timeline_export` | Write `.docx` (summary, task schedule, milestones, budget) or `.xlsx` (Summary, Tasks, colored Gantt sheet) |

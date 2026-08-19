@@ -2,7 +2,9 @@ import { defineTool, type ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from '@deepseek-ai/dsh-session'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve } from 'node:path'
+import { addDays, parseDate, toIso, todayIso } from './date.js'
 import { buildDocx, buildXlsx, slugify } from './export.js'
+import { buildHolidaySet } from './holidays.js'
 import { schedule, type TaskInput } from './scheduler.js'
 import { loadProject, saveProject, type ProjectState } from './state.js'
 import type { ProjectDefinition, Timeline } from './types.js'
@@ -90,6 +92,15 @@ const definitionSchema = {
     owners: { type: 'array', items: { type: 'string' }, description: 'Task owners (default: Team)' },
     reportingCadence: { type: 'string', description: 'Reporting cadence, e.g. bi-weekly (default bi-weekly)' },
     sprintDays: { type: 'integer', description: 'Sprint length in days (default 14)' },
+    calendar: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        country: { type: 'string', description: 'ISO 3166-1 alpha-2 country code for public holidays, e.g. SG' },
+        holidays: { type: 'array', items: { type: 'string' }, description: 'Extra holiday dates (YYYY-MM-DD)' },
+      },
+      description: 'Workday calendar: public holidays for the country plus extra days off',
+    },
   },
 } as const
 
@@ -256,7 +267,12 @@ export const generateTimelineTool = defineTool({
   },
   async execute(args, exec) {
     const definition = args.definition as ProjectDefinition
-    const timeline = schedule(definition, args.tasks as TaskInput[], args.hoursPerDay ?? 8)
+    // Holidays over the planned span: from start (or today) to the deadline,
+    // or ~1 year out when no deadline was set.
+    const startIso = definition.startDate ?? todayIso()
+    const endIso = definition.deadline ?? toIso(addDays(parseDate(startIso), 366))
+    const holidays = buildHolidaySet(definition.calendar?.country, startIso, endIso, definition.calendar?.holidays)
+    const timeline = schedule(definition, args.tasks as TaskInput[], args.hoursPerDay ?? 8, holidays)
     const statePath = await saveProject(resolveCwd(exec), {
       definition,
       timeline,
@@ -325,6 +341,12 @@ export const updateTimelineTool = defineTool({
       if (patch.pinnedEnd !== undefined) input.pinnedEnd = patch.pinnedEnd
     }
 
+    const holidays = buildHolidaySet(
+      definition?.calendar?.country,
+      timeline.startDate,
+      timeline.endDate,
+      definition?.calendar?.holidays,
+    )
     const scheduled = schedule(
       {
         name: timeline.projectName,
@@ -336,6 +358,7 @@ export const updateTimelineTool = defineTool({
       },
       inputs,
       timeline.hoursPerDay,
+      holidays,
     )
     const cwd = resolveCwd(exec)
     const existing = await loadProject(cwd)

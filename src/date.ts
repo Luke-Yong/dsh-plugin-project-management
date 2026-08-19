@@ -1,5 +1,12 @@
 const MS_PER_DAY = 86_400_000
 
+/**
+ * Calendar extras threaded through the workday math. Dates are ISO strings
+ * (YYYY-MM-DD) excluded from workdays — e.g. public holidays resolved from
+ * `date-holidays` via `src/holidays.ts`.
+ */
+export type HolidaySet = ReadonlySet<string>
+
 /** Parse an ISO date (YYYY-MM-DD) as a local-midnight Date. */
 export function parseDate(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number)
@@ -20,45 +27,49 @@ export function addDays(date: Date, days: number): Date {
   return copy
 }
 
-/** Monday-Friday is considered a workday. */
-export function isWorkday(date: Date): boolean {
+/**
+ * Monday-Friday is a workday, unless the date is a holiday. Leap years and
+ * month/year rollovers are handled by JS `Date` calendar arithmetic.
+ */
+export function isWorkday(date: Date, holidays?: HolidaySet): boolean {
   const day = date.getDay()
-  return day !== 0 && day !== 6
+  if (day === 0 || day === 6) return false
+  return holidays === undefined || holidays.size === 0 || !holidays.has(toIso(date))
 }
 
 /** The first workday strictly after `date`. */
-export function nextWorkday(date: Date): Date {
+export function nextWorkday(date: Date, holidays?: HolidaySet): Date {
   let cursor = addDays(date, 1)
-  while (!isWorkday(cursor)) cursor = addDays(cursor, 1)
+  while (!isWorkday(cursor, holidays)) cursor = addDays(cursor, 1)
   return cursor
 }
 
 /** Add `n` workdays strictly after `start`. */
-export function addWorkdays(start: Date, n: number): Date {
+export function addWorkdays(start: Date, n: number, holidays?: HolidaySet): Date {
   let cursor = start
-  for (let i = 0; i < n; i++) cursor = nextWorkday(cursor)
+  for (let i = 0; i < n; i++) cursor = nextWorkday(cursor, holidays)
   return cursor
 }
 
 /** The `n`-th workday strictly before `end` (moves backwards). */
-export function subtractWorkdays(end: Date, n: number): Date {
+export function subtractWorkdays(end: Date, n: number, holidays?: HolidaySet): Date {
   let cursor = end
-  for (let i = 0; i < n; i++) cursor = previousWorkday(cursor)
+  for (let i = 0; i < n; i++) cursor = previousWorkday(cursor, holidays)
   return cursor
 }
 
 /** The first workday strictly before `date`. */
-export function previousWorkday(date: Date): Date {
+export function previousWorkday(date: Date, holidays?: HolidaySet): Date {
   let cursor = addDays(date, -1)
-  while (!isWorkday(cursor)) cursor = addDays(cursor, -1)
+  while (!isWorkday(cursor, holidays)) cursor = addDays(cursor, -1)
   return cursor
 }
 
 /** Number of workdays in the inclusive range [start, end]. */
-export function workdayCountInclusive(start: Date, end: Date): number {
+export function workdayCountInclusive(start: Date, end: Date, holidays?: HolidaySet): number {
   let count = 0
   for (let cursor = new Date(start); cursor <= end; cursor = addDays(cursor, 1)) {
-    if (isWorkday(cursor)) count++
+    if (isWorkday(cursor, holidays)) count++
   }
   return count
 }
@@ -69,10 +80,10 @@ export function diffDays(a: Date, b: Date): number {
 }
 
 /** ISO workday dates in [start, end], inclusive. */
-export function listWorkdays(start: Date, end: Date): string[] {
+export function listWorkdays(start: Date, end: Date, holidays?: HolidaySet): string[] {
   const out: string[] = []
   for (let cursor = new Date(start); cursor <= end; cursor = addDays(cursor, 1)) {
-    if (isWorkday(cursor)) out.push(toIso(cursor))
+    if (isWorkday(cursor, holidays)) out.push(toIso(cursor))
   }
   return out
 }
