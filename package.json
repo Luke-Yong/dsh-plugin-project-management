@@ -17,6 +17,9 @@
     "./package.json": "./package.json"
   },
   "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "inject": [
@@ -27,7 +30,8 @@
   },
   "files": [
     "dist",
-    "lib"
+    "lib",
+    "cordis.patch.yml"
   ],
   "scripts": {
     "prepare": "npm run build",

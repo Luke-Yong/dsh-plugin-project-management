@@ -1,0 +1,5 @@
+# dsh.bundle patch: makes the plugin installable via `dsh plugin add`
+# (GitHub/npm installs resolve `name` from the installed package).
+- insert:
+    - id: project-management
+      name: dsh-plugin-project-management
