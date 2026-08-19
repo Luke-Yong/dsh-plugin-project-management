@@ -187,11 +187,13 @@ function buildTicks(
 }
 
 /** Sticky name cell that stays visible while the timeline scrolls horizontally. */
-function NameCell({ width, background, line, title, children }: {
+function NameCell({ width, background, line, title, stickyTop, children }: {
   width: number
   background: string
   line: string
   title?: string
+  /** Also pin vertically (used by the frozen header row). */
+  stickyTop?: boolean
   children: ReactNode
 }): ReactElement {
   return (
@@ -200,7 +202,8 @@ function NameCell({ width, background, line, title, children }: {
       style={{
         position: 'sticky',
         left: 0,
-        zIndex: 4,
+        top: stickyTop ? 0 : undefined,
+        zIndex: stickyTop ? 7 : 4,
         flex: `0 0 ${width}px`,
         padding: '0 8px',
         overflow: 'hidden',
@@ -380,9 +383,18 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
 
       <div style={{ ...scrollStyle, maxHeight }}>
         <div style={{ width: nameWidth + timelineW, minWidth: nameWidth + 400 }}>
-          {/* Ruler header */}
-          <div style={{ ...rowStyle, background: c.bandA, borderBottom: `2px solid ${c.line}` }}>
-            <NameCell width={nameWidth} background={c.bandA} line={c.line}>Task</NameCell>
+          {/* Ruler header — sticky top so the date row stays visible on vertical scroll. */}
+          <div
+            style={{
+              ...rowStyle,
+              position: 'sticky',
+              top: 0,
+              zIndex: 6,
+              background: c.bandA,
+              borderBottom: `2px solid ${c.line}`,
+            }}
+          >
+            <NameCell width={nameWidth} background={c.bandA} line={c.line} stickyTop>Task</NameCell>
             <div style={{ position: 'relative', flex: 1, height: rulerH }}>
               {ticks.coarse.map((tick, index) => (
                 <div

@@ -40,11 +40,11 @@ interface BoxModelCss {
  * Complements the "Project" view tab: the composer area renders even for
  * blank/0-turn sessions, while the view-tab ring only appears once a session
  * is active. The dock auto-appears whenever a saved project exists and can be
- * dismissed locally. Its width and horizontal position mirror the composer
- * root (`PHRFWG_root`), which is what sizes the composer card, so it stays
- * aligned as the window resizes. A segmented control switches between
- * the text summary and a client-side Gantt chart; both surfaces follow the
- * harness theme.
+ * minimized to a header-only bar (it stays available across turns). Its width
+ * and horizontal position mirror the composer root (`PHRFWG_root`), which is
+ * what sizes the composer card, so it stays aligned as the window resizes. A
+ * segmented control switches between the text summary and a client-side Gantt
+ * chart; both surfaces follow the harness theme.
  */
 export function ProjectDock({ sessionId }: ProjectDockProps): ReactElement | null {
   const c = useThemeColors()
@@ -52,6 +52,7 @@ export function ProjectDock({ sessionId }: ProjectDockProps): ReactElement | nul
   const [state, setState] = useState<ProjectStateWire | undefined>()
   const [loaded, setLoaded] = useState(false)
   const [dismissed, setDismissed] = useState(false)
+  const [minimized, setMinimized] = useState(false)
   const [view, setView] = useState<ViewMode>('text')
   const [stackCss, setStackCss] = useState<BoxModelCss | undefined>()
 
@@ -146,7 +147,7 @@ export function ProjectDock({ sessionId }: ProjectDockProps): ReactElement | nul
   }, [sessionId])
 
   const timeline = state?.timeline
-  if (loaded && (state === undefined || dismissed)) return null
+  if (loaded && state === undefined) return null
 
   const handleCommit = async (updates: TaskDateUpdate[]): Promise<void> => {
     if (!sessionId) return
@@ -193,7 +194,7 @@ export function ProjectDock({ sessionId }: ProjectDockProps): ReactElement | nul
     color: c.primary,
   }
 
-  const closeStyle: CSSProperties = {
+  const iconButtonStyle: CSSProperties = {
     cursor: 'pointer',
     border: 'none',
     background: 'transparent',
@@ -229,16 +230,16 @@ export function ProjectDock({ sessionId }: ProjectDockProps): ReactElement | nul
           {state !== undefined && (
             <button
               type="button"
-              onClick={() => setDismissed(true)}
-              title="Close"
-              style={closeStyle}
+              onClick={() => setMinimized((value) => !value)}
+              title={minimized ? 'Expand' : 'Minimize'}
+              style={iconButtonStyle}
             >
-              ✕
+              {minimized ? '▸' : '–'}
             </button>
           )}
         </div>
-        {!loaded && <div style={{ color: c.muted }}>Loading…</div>}
-        {loaded && state !== undefined && (
+        {!minimized && !loaded && <div style={{ color: c.muted }}>Loading…</div>}
+        {!minimized && loaded && state !== undefined && (
           <div style={{ display: 'grid', gap: '2px' }}>
             {timeline !== undefined && timeline.tasks.length > 0 && (
               <div style={toggleStyle}>
