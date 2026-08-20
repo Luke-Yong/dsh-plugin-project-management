@@ -134,12 +134,27 @@ const patchSchema = {
     pinnedStart: { type: 'string' },
     pinnedEnd: { type: 'string' },
     clearPins: { type: 'boolean', description: 'Remove manual date pins so the task is re-scheduled' },
+    progress: { type: 'number', description: 'Completion percentage (0-100)' },
   },
 } as const
 
 // ---------------------------------------------------------------------------
 // Render helpers
 // ---------------------------------------------------------------------------
+
+/** Drop any undefined-valued keys from an object or its descendants so the
+ *  harness value-schema accepts the JSON as lossless round-trippable. */
+function lossless<T>(value: T): T {
+  if (value === null) return value
+  if (Array.isArray(value)) return value.map((v) => lossless(v)) as T
+  if (typeof value !== 'object') return value
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (v === undefined) continue
+    out[k] = lossless(v)
+  }
+  return out as T
+}
 
 function renderTimeline(timeline: Timeline, statePath?: string): string {
   const lines = [
@@ -150,6 +165,11 @@ function renderTimeline(timeline: Timeline, statePath?: string): string {
   for (const conflict of timeline.conflicts) lines.push(`Conflict: ${conflict}`)
   if (timeline.criticalPath.length > 0) {
     lines.push(`Critical path: ${timeline.criticalPath.join(' → ')}`)
+  }
+  if (timeline.tasks.length > 0) {
+    const overall = Math.round(timeline.tasks.reduce((sum, t) => sum + (t.progress ?? 0), 0) / timeline.tasks.length)
+    const done = timeline.tasks.filter((t) => (t.progress ?? 0) >= 100).length
+    lines.push(`Overall progress: ${overall}% (${done} of ${timeline.tasks.length} tasks complete).`)
   }
   if (statePath) lines.push(`Saved to: ${statePath}`)
   lines.push('')
@@ -278,7 +298,7 @@ export const generateTimelineTool = defineTool({
       timeline,
       updatedAt: new Date().toISOString(),
     })
-    return { timeline, statePath } as unknown as JsonValue
+    return lossless({ timeline, statePath }) as unknown as JsonValue
   },
 })
 
@@ -309,7 +329,19 @@ export const updateTimelineTool = defineTool({
     const timeline = args.timeline as unknown as Timeline
     const definition = args.definition as unknown as ProjectDefinition | undefined
     const skippedIds: string[] = []
+    const cwd = resolveCwd(exec)
+    const existing = await loadProject(cwd)
 
+    // The passed timeline may predate progress tracking (or omit values the
+    // agent did not re-send). The saved file is the source of truth for
+    // progress: tasks without an explicit value keep their persisted
+    // percentage so an unrelated patch cannot silently zero them.
+    const persistedProgress = new Map<string, number>()
+    for (const task of existing?.timeline?.tasks ?? []) {
+      if (typeof task.progress === 'number' && Number.isFinite(task.progress)) {
+        persistedProgress.set(task.id, task.progress)
+      }
+    }
     const inputs: TaskInput[] = timeline.tasks.map((t) => ({
       id: t.id,
       name: t.name,
@@ -319,8 +351,10 @@ export const updateTimelineTool = defineTool({
       agents: t.agents,
       pinnedStart: t.pinned ? t.start : undefined,
       pinnedEnd: t.pinned ? t.end : undefined,
+      progress: persistedProgress.get(t.id) ?? t.progress,
     }))
     const byId = new Map(inputs.map((t) => [t.id, t]))
+    const patchedProgressIds = new Set<string>()
 
     for (const patch of args.patches) {
       const input = byId.get(patch.id)
@@ -339,6 +373,10 @@ export const updateTimelineTool = defineTool({
       }
       if (patch.pinnedStart !== undefined) input.pinnedStart = patch.pinnedStart
       if (patch.pinnedEnd !== undefined) input.pinnedEnd = patch.pinnedEnd
+      if (patch.progress !== undefined) {
+        input.progress = patch.progress
+        patchedProgressIds.add(patch.id)
+      }
     }
 
     const holidays = buildHolidaySet(
@@ -360,14 +398,12 @@ export const updateTimelineTool = defineTool({
       timeline.hoursPerDay,
       holidays,
     )
-    const cwd = resolveCwd(exec)
-    const existing = await loadProject(cwd)
     const statePath = await saveProject(cwd, {
       definition: definition ?? existing?.definition ?? { name: timeline.projectName, features: [] },
       timeline: scheduled,
       updatedAt: new Date().toISOString(),
     })
-    return { timeline: scheduled, skippedIds, statePath } as unknown as JsonValue
+    return lossless({ timeline: scheduled, skippedIds, statePath }) as unknown as JsonValue
   },
 })
 
@@ -408,7 +444,7 @@ export const loadProjectTool = defineTool({
   },
   async execute(args, exec) {
     const state = await loadProject(args.cwd ?? resolveCwd(exec))
-    return { state, loaded: state !== undefined } as unknown as JsonValue
+    return lossless({ state, loaded: state !== undefined }) as unknown as JsonValue
   },
 })
 

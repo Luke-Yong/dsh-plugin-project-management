@@ -25,6 +25,8 @@ export interface TaskInput {
   pinnedStart?: string
   /** Manual end override (ISO date). Kept as-is by the scheduler. */
   pinnedEnd?: string
+  /** Completion percentage (0-100); preserved through re-scheduling. */
+  progress?: number
   /** Optional access tier id for the project-plan document. */
   tier?: string
   /** Optional owner for the project-plan document. */
@@ -156,6 +158,7 @@ export function schedule(
       start: toIso(start),
       end: toIso(end),
       status: 'planned',
+      progress: t.progress ?? 0,
       pinned: Boolean(t.pinnedStart || t.pinnedEnd),
       critical: criticalIds.has(t.id),
       tier: t.tier,

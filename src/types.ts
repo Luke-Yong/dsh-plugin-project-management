@@ -93,6 +93,8 @@ export interface TimelineTask {
   /** ISO date (YYYY-MM-DD), computed by the scheduler. */
   end: string
   status: 'planned'
+  /** Completion percentage (0-100); defaults to 0 when not set. */
+  progress?: number
   /** Whether the dates were manually pinned instead of scheduled. */
   pinned?: boolean
   /** Whether the task lies on the critical path. */

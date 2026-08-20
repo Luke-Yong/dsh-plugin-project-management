@@ -495,6 +495,7 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
             {bars.map(({ task, leftPx, widthPx, color }, index) => {
               const bg = index % 2 === 0 ? c.bandA : c.bandB
               const isDragging = drag?.id === task.id
+              const progress = Math.min(100, Math.max(0, task.progress ?? 0))
               const edgeHandle: CSSProperties = {
                 position: 'absolute',
                 top: 0,
@@ -508,7 +509,7 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
                   <NameCell width={nameWidth} background={bg} line={c.line} title={task.name}>{task.name}</NameCell>
                   <div style={{ position: 'relative', flex: 1, height: ROW_H }}>
                     <div
-                      title={`${task.name} (${task.start} → ${task.end})`}
+                      title={`${task.name} (${task.start} → ${task.end}) — ${Math.round(progress)}% complete`}
                       onPointerDown={editable ? startDrag(task, 'move') : undefined}
                       onPointerMove={editable ? moveDrag(task.id) : undefined}
                       onPointerUp={editable ? endDrag(task.id) : undefined}
@@ -520,7 +521,7 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
                         top: 3,
                         bottom: 3,
                         borderRadius: 4,
-                        background: color,
+                        background: hexToRgba(color, 0.32),
                         color: '#fff',
                         fontSize: 10,
                         lineHeight: `${ROW_H - 6}px`,
@@ -528,6 +529,7 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
+                        textShadow: '0 1px 1px rgba(0, 0, 0, 0.3)',
                         zIndex: 2,
                         cursor: editable ? 'move' : undefined,
                         touchAction: editable ? 'none' : undefined,
@@ -538,7 +540,26 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
                             : '0 1px 2px rgba(41, 42, 45, 0.25)',
                       }}
                     >
-                      {widthPx >= 36 ? task.name : ''}
+                      {progress > 0 && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: `${progress}%`,
+                            background: color,
+                            borderTopLeftRadius: 4,
+                            borderBottomLeftRadius: 4,
+                          }}
+                        />
+                      )}
+                      <span style={{ position: 'relative', zIndex: 1 }}>
+                        {widthPx >= 36 ? task.name : ''}
+                        {progress > 0 && widthPx >= 64 && (
+                          <span style={{ marginLeft: 4, opacity: 0.9 }}>{Math.round(progress)}%</span>
+                        )}
+                      </span>
                       {editable && (
                         <>
                           <div
@@ -653,6 +674,10 @@ export function GanttChart({ timeline, nameWidth = NAME_W, maxHeight = 440, onCo
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
               <span style={{ width: 8, height: 8, background: c.primaryDark, transform: 'rotate(45deg)', borderRadius: 1, display: 'inline-block' }} />
               Milestone
+            </span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 16, height: 8, borderRadius: 2, display: 'inline-block', background: `linear-gradient(90deg, ${c.primary} 50%, ${hexToRgba(c.primary, 0.32)} 50%)` }} />
+              Progress (filled = completed)
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
               <span style={{ width: 0, borderLeft: `2px solid ${c.danger}`, height: 10, display: 'inline-block' }} />

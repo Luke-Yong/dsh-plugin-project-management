@@ -151,7 +151,7 @@ export function buildProjectData(
     sprint: sprintNumberFor(task.start, sprints),
     start: task.start,
     end: task.end,
-    progress: 0,
+    progress: task.progress ?? 0,
     dependencies: task.dependsOn,
     owner: task.owner ?? defaultOwner,
   }))
@@ -232,6 +232,7 @@ export function fromJourneyDocument(raw: JourneyDocument): {
       start: task.start,
       end: task.end,
       status: 'planned',
+      progress: task.progress,
       critical: false,
       tier: task.tier,
       owner: task.owner,

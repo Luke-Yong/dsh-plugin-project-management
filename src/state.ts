@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { buildProjectData, fromJourneyDocument, isJourneyDocument } from './project-plan.js'
+import { buildProjectData, fromJourneyDocument, isJourneyDocument, type JourneyDocument } from './project-plan.js'
 import type { ProjectDefinition, Timeline } from './types.js'
 
 /**
@@ -24,15 +24,39 @@ export function projectStatePath(cwd: string): string {
 function parseState(raw: unknown): ProjectState | undefined {
   if (isJourneyDocument(raw)) {
     if (raw._dsh !== undefined) {
-      return {
+      const state: ProjectState = {
         definition: raw._dsh.definition,
         timeline: raw._dsh.timeline,
         updatedAt: raw._dsh.updatedAt,
       }
+      // The journey document's top-level tasks are the shared data file a
+      // user may hand-edit. Merge their progress into the plugin state so
+      // manual updates show up in the UI and survive the next save.
+      return mergeJourneyProgress(state, raw)
     }
     return fromJourneyDocument(raw)
   }
   return raw as ProjectState
+}
+
+/**
+ * Copy `progress` from the journey document's top-level tasks into the
+ * `_dsh` timeline (matched by task id). Values outside 0-100 are clamped.
+ */
+function mergeJourneyProgress(state: ProjectState, raw: JourneyDocument): ProjectState {
+  if (state.timeline === undefined || raw.tasks === undefined) return state
+  const progressById = new Map<string, number>()
+  for (const task of raw.tasks) {
+    if (typeof task.progress === 'number' && Number.isFinite(task.progress)) {
+      progressById.set(task.id, Math.min(100, Math.max(0, task.progress)))
+    }
+  }
+  if (progressById.size === 0) return state
+  const tasks = state.timeline.tasks.map((task) => {
+    const progress = progressById.get(task.id)
+    return progress !== undefined && progress !== task.progress ? { ...task, progress } : task
+  })
+  return { ...state, timeline: { ...state.timeline, tasks } }
 }
 
 async function readStateFile(path: string): Promise<ProjectState | undefined> {

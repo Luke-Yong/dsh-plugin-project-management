@@ -41,6 +41,8 @@ export interface WireTimelineTask {
   end: string
   critical?: boolean
   owner?: string
+  /** Completion percentage (0-100). */
+  progress?: number
 }
 
 /** A manual timeline adjustment committed from the client surface. */

@@ -211,6 +211,7 @@ export function registerProjectTimelineUpdateRoute(
           agents: task.agents,
           tier: task.tier,
           owner: task.owner,
+          progress: task.progress,
           pinnedStart: task.start,
           pinnedEnd: task.end,
         }

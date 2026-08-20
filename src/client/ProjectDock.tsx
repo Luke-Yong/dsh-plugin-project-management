@@ -24,6 +24,9 @@ const COMPOSER_STACK_SELECTOR = '.TFSGfa_composerStack'
 /** Last resort: the composer card itself (hashed CSS-module class). */
 const COMPOSER_CARD_SELECTOR = '.PHRFWG_card'
 
+/** How often the dock re-reads the project state file (hot reload). */
+const POLL_MS = 5000
+
 /** Horizontal box model copied from the harness element that sets the width. */
 interface BoxModelCss {
   boxSizing: string
@@ -55,6 +58,15 @@ export function ProjectDock({ sessionId }: ProjectDockProps): ReactElement | nul
   const [minimized, setMinimized] = useState(false)
   const [view, setView] = useState<ViewMode>('text')
   const [stackCss, setStackCss] = useState<BoxModelCss | undefined>()
+  // Pause hot-reload while the user is interacting (dragging a Gantt bar) so
+  // a poll cannot clobber an in-flight optimistic update.
+  const interactingRef = useRef(false)
+  // Skip re-renders when the fetched state is unchanged.
+  const lastStateJsonRef = useRef<string>()
+  const minimizedRef = useRef(minimized)
+  useEffect(() => {
+    minimizedRef.current = minimized
+  }, [minimized])
 
   // Replicate the composer root's horizontal box model (padding, margins,
   // width, max-width, box-sizing) on a wrapper so the dock lays out at exactly
@@ -129,30 +141,66 @@ export function ProjectDock({ sessionId }: ProjectDockProps): ReactElement | nul
     }
   }, [])
 
+  // Hot reload: initial fetch, then poll the state file every POLL_MS while a
+  // project is visible, plus a re-fetch on window focus. Paused during drags.
+  useEffect(() => {
+    const down = (): void => { interactingRef.current = true }
+    const up = (): void => { interactingRef.current = false }
+    window.addEventListener('pointerdown', down, true)
+    window.addEventListener('pointerup', up, true)
+    window.addEventListener('pointercancel', up, true)
+    return () => {
+      window.removeEventListener('pointerdown', down, true)
+      window.removeEventListener('pointerup', up, true)
+      window.removeEventListener('pointercancel', up, true)
+    }
+  }, [])
+
   useEffect(() => {
     if (!sessionId) return
     let cancelled = false
-    void fetchProjectState(sessionId)
-      .then((data) => {
+    let busy = false
+    const refresh = async (): Promise<void> => {
+      if (busy || interactingRef.current || minimizedRef.current) return
+      busy = true
+      try {
+        const data = await fetchProjectState(sessionId)
         if (cancelled) return
-        setState(data)
+        if (data !== undefined) {
+          const json = JSON.stringify(data)
+          if (json !== lastStateJsonRef.current) {
+            lastStateJsonRef.current = json
+            setState(data)
+          }
+        }
         setLoaded(true)
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setLoaded(true)
-      })
+      } finally {
+        busy = false
+      }
+    }
+    void refresh()
+    const timer = window.setInterval(() => void refresh(), POLL_MS)
+    window.addEventListener('focus', refresh)
     return () => {
       cancelled = true
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
     }
   }, [sessionId])
 
   const timeline = state?.timeline
   if (loaded && state === undefined) return null
+  const overallProgress = timeline !== undefined && timeline.tasks.length > 0
+    ? Math.round(timeline.tasks.reduce((sum, t) => sum + (t.progress ?? 0), 0) / timeline.tasks.length)
+    : undefined
 
   const handleCommit = async (updates: TaskDateUpdate[]): Promise<void> => {
     if (!sessionId) return
     const next = await updateProjectTimeline(sessionId, updates)
     if (next !== undefined) {
+      lastStateJsonRef.current = JSON.stringify(next)
       setState(next)
     } else {
       // Commit failed — revert the optimistic drag to the persisted state.
@@ -272,7 +320,8 @@ export function ProjectDock({ sessionId }: ProjectDockProps): ReactElement | nul
                   <strong>{state.definition.name}</strong>
                   {timeline !== undefined && (
                     <span style={{ color: c.muted }}>
-                      {' '}· {timeline.startDate} → {timeline.endDate} ({timeline.tasks.length} tasks)
+                      {' '}· {timeline.startDate} → {timeline.endDate} ({timeline.tasks.length} tasks
+                      {overallProgress !== undefined && <> · {overallProgress}% complete</>})
                     </span>
                   )}
                 </div>
